@@ -8,6 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@autopilot/contracts':
+        specifier: file:../autopilot-suite/packages/contracts
+        version: file:../autopilot-suite/packages/contracts
+      '@autopilot/jobforge-client':
+        specifier: file:../autopilot-suite/packages/jobforge-client
+        version: file:../autopilot-suite/packages/jobforge-client
+      '@autopilot/profiles':
+        specifier: file:../autopilot-suite/packages/profiles
+        version: file:../autopilot-suite/packages/profiles
       commander:
         specifier: ^12.1.0
         version: 12.1.0
@@ -51,6 +60,15 @@ packages:
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
+
+  '@autopilot/contracts@file:../autopilot-suite/packages/contracts':
+    resolution: {directory: ../autopilot-suite/packages/contracts, type: directory}
+
+  '@autopilot/jobforge-client@file:../autopilot-suite/packages/jobforge-client':
+    resolution: {directory: ../autopilot-suite/packages/jobforge-client, type: directory}
+
+  '@autopilot/profiles@file:../autopilot-suite/packages/profiles':
+    resolution: {directory: ../autopilot-suite/packages/profiles, type: directory}
 
   '@babel/helper-string-parser@7.27.1':
     resolution: {integrity: sha512-qMlSxKbpRlAridDExk92nSobyDdpPijUq2DW6oDnUqd0iOGxmQjyqhMIihI9+zv4LPyZdRje2cavWPbCbWm3eA==}
@@ -1437,6 +1455,20 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
       '@jridgewell/trace-mapping': 0.3.31
+
+  '@autopilot/contracts@file:../autopilot-suite/packages/contracts':
+    dependencies:
+      zod: 3.25.76
+
+  '@autopilot/jobforge-client@file:../autopilot-suite/packages/jobforge-client':
+    dependencies:
+      '@autopilot/contracts': file:../autopilot-suite/packages/contracts
+      zod: 3.25.76
+
+  '@autopilot/profiles@file:../autopilot-suite/packages/profiles':
+    dependencies:
+      '@autopilot/contracts': file:../autopilot-suite/packages/contracts
+      zod: 3.25.76
 
   '@babel/helper-string-parser@7.27.1': {}
 

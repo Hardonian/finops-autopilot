@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Runnerless FinOps autopilot for billing reconciliation, anomaly detection, and churn risk signals",
   "author": "AnomalyCo",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "type": "module",
   "engines": {
     "node": ">=20.0.0",
@@ -16,7 +16,7 @@
     "finops": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts src/cli.ts --format esm --dts --clean",
+    "build": "tsc",
     "dev": "tsx watch src/cli.ts",
     "lint": "eslint src --ext .ts --max-warnings=0",
     "lint:fix": "eslint src --ext .ts --fix",
@@ -24,25 +24,24 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
-    "runnerless:audit": "echo 'Install @autopilot/audit-cli and run: autopilot-audit runnerless .'",
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "runnerless:audit": "autopilot-audit runnerless . || echo 'Install @autopilot/runnerless-audit globally'",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@autopilot/contracts": "file:../autopilot-suite/packages/contracts",
-    "@autopilot/jobforge-client": "file:../autopilot-suite/packages/jobforge-client",
-    "@autopilot/profiles": "file:../autopilot-suite/packages/profiles",
+    "@autopilot/contracts": "workspace:*",
+    "@autopilot/jobforge-client": "workspace:*",
+    "@autopilot/profiles": "workspace:*",
     "commander": "^12.1.0",
-    "zod": "^3.23.8"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/node": "^22.10.5",
+    "@types/node": "^20.17.0",
     "@typescript-eslint/eslint-plugin": "^8.19.0",
     "@typescript-eslint/parser": "^8.19.0",
     "@vitest/coverage-v8": "^2.1.8",
     "eslint": "^9.17.0",
     "globals": "^17.3.0",
-    "tsup": "^8.3.5",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

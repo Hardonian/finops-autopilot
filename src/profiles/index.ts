@@ -3,10 +3,29 @@
  * 
  * Provides base and per-app profiles for configuring thresholds,
  * alert routing, and redaction settings.
+ * 
+ * Re-exports suite profiles for interoperability.
  */
 
 import type { Profile, AnomalyThreshold, ChurnThreshold } from '../contracts/index.js';
 import { ProfileSchema } from '../contracts/index.js';
+
+// Re-export suite profile functions for compatibility
+export {
+  baseProfile as suiteBaseProfile,
+  createJobforgeProfile,
+  createSettlerProfile,
+  createReadyLayerProfile,
+  createAIASProfile,
+  createKeysProfile,
+  getProfile as getSuiteProfile,
+  listProfiles as listSuiteProfiles,
+  mergeProfileWithOverlay,
+  validateProfile as validateSuiteProfile,
+  serializeProfile as serializeSuiteProfile,
+  getThreshold,
+  exceedsThreshold,
+} from '@autopilot/profiles';
 
 // Default anomaly thresholds
 const DEFAULT_ANOMALY_THRESHOLDS: AnomalyThreshold = {
