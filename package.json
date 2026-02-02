@@ -25,9 +25,13 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test",
+    "runnerless:audit": "echo 'Install @autopilot/audit-cli and run: autopilot-audit runnerless .'",
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
+    "@autopilot/contracts": "file:../autopilot-suite/packages/contracts",
+    "@autopilot/jobforge-client": "file:../autopilot-suite/packages/jobforge-client",
+    "@autopilot/profiles": "file:../autopilot-suite/packages/profiles",
     "commander": "^12.1.0",
     "zod": "^3.23.8"
   },
