@@ -3,9 +3,57 @@
  * 
  * All entities are multi-tenant safe with required tenant_id + project_id
  * All timestamps are ISO 8601 strings for deterministic serialization
+ * 
+ * This module re-exports canonical types from @autopilot/contracts for suite compatibility
  */
 
 import { z } from 'zod';
+
+// ============================================================================
+// Re-exports from @autopilot/contracts (Suite Compatibility)
+// ============================================================================
+
+export {
+  // Tenant Context
+  TenantContextSchema,
+  type TenantContext,
+  validateTenantContext,
+  
+  // Event Envelope
+  EventEnvelopeSchema,
+  type EventEnvelope,
+  type EventMetadata,
+  createEventEnvelope,
+  
+  // Run Manifest
+  RunManifestSchema,
+  type RunManifest,
+  type Output,
+  createRunManifest,
+  
+  // Report Envelope
+  ReportEnvelopeSchema,
+  type ReportEnvelope,
+  type ReportType,
+  type Severity,
+  type EvidenceLink,
+  type Finding,
+  createReportEnvelope,
+  
+  // Redaction
+  RedactionPatternSchema,
+  RedactionHintsSchema,
+  type RedactionPattern,
+  type RedactionHints,
+  DEFAULT_REDACTION_PATTERNS,
+  createRedactionHints,
+  redactObject,
+  
+  // Utilities
+  canonicalizeForHash,
+  stableHash,
+  serializeDeterministic,
+} from '@autopilot/contracts';
 
 // ============================================================================
 // Primitive Types
