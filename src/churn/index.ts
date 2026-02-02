@@ -219,7 +219,7 @@ function assessPaymentFailures(
  * Assess usage drop signal (requires external usage data)
  */
 function assessUsageDrop(
-  metrics: Array<{ metric_name: string; current_value: number; previous_value: number; period_days: number }>,
+  metrics: { metric_name: string; current_value: number; previous_value: number; period_days: number }[],
   thresholds: ChurnThreshold
 ): ChurnSignal | null {
   if (metrics.length === 0) return null;
@@ -260,7 +260,7 @@ function assessUsageDrop(
  * Assess support ticket signal
  */
 function assessSupportTickets(
-  tickets: Array<{ severity: string; status: string; category: string }>,
+  tickets: { severity: string; status: string; category: string }[],
   thresholds: ChurnThreshold
 ): ChurnSignal | null {
   if (tickets.length === 0) return null;
@@ -300,7 +300,7 @@ function assessSupportTickets(
  * Assess plan downgrade signal
  */
 function assessPlanDowngrades(
-  downgrades: Array<{ from_plan: string; to_plan: string; changed_at: string }>,
+  downgrades: { from_plan: string; to_plan: string; changed_at: string }[],
   thresholds: ChurnThreshold
 ): ChurnSignal | null {
   if (downgrades.length === 0) return null;

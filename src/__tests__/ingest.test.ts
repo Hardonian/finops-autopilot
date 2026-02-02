@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { ingestEvents } from '../ingest/index.js';
-import type { NormalizedEvent } from '../contracts/index.js';
 
 describe('Ingest', () => {
   describe('determinism', () => {

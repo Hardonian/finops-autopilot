@@ -1,13 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   BillingEventSchema,
-  NormalizedEventSchema,
   LedgerStateSchema,
-  ReconReportSchema,
-  AnomalySchema,
-  ChurnRiskSchema,
-  JobRequestSchema,
-  ProfileSchema,
 } from '../contracts/index.js';
 
 describe('Contracts', () => {

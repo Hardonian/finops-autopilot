@@ -44,9 +44,10 @@ describe('JobForge', () => {
         supportTicketsPath: './tickets.json',
       });
 
-      expect(job.job_type).toBe('autopilot.finops.churn_risk_report');
-      expect(job.payload.inputs.usage_metrics).toBeDefined();
-      expect(job.payload.inputs.support_tickets).toBeDefined();
+expect(job.job_type).toBe('autopilot.finops.churn_risk_report');
+      const inputs = job.payload.inputs as Record<string, unknown>;
+      expect(inputs.usage_metrics).toBeDefined();
+      expect(inputs.support_tickets).toBeDefined();
     });
   });
 

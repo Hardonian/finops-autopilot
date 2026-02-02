@@ -15,7 +15,7 @@ describe('Churn', () => {
             tenant_id: 'test-tenant',
             project_id: 'test-project',
             subscriptions: [
-              {
+{
                 subscription_id: 'sub_1',
                 customer_id: 'cus_1',
                 plan_id: 'plan_pro',
@@ -25,6 +25,7 @@ describe('Churn', () => {
                 mrr_cents: 5000,
                 currency: 'USD',
                 created_at: '2024-01-01T00:00:00Z',
+                cancel_at_period_end: false,
               },
             ],
             total_mrr_cents: 5000,
