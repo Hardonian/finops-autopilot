@@ -1,0 +1,109 @@
+{
+  "description": "Example JobForge job requests for finops-autopilot",
+  "jobs": [
+    {
+      "job_type": "autopilot.finops.reconcile",
+      "job_id": "autopilot.finops.reconcile:demo-tenant:demo-project:1706745600000",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "requested_at": "2024-02-01T00:00:00Z",
+      "payload": {
+        "operation": "reconcile",
+        "period_start": "2024-01-01T00:00:00Z",
+        "period_end": "2024-01-31T23:59:59Z",
+        "events_source": {
+          "type": "file",
+          "path": "./input/billing-events.json",
+          "format": "json"
+        },
+        "output": {
+          "ledger_path": "./output/ledger-demo-tenant-demo-project.json",
+          "report_path": "./output/recon-demo-tenant-demo-project.json"
+        }
+      },
+      "priority": "normal",
+      "max_retries": 3,
+      "timeout_seconds": 300,
+      "metadata": {
+        "generated_by": "finops-autopilot",
+        "version": "1.0.0",
+        "profile": "base"
+      }
+    },
+    {
+      "job_type": "autopilot.finops.anomaly_scan",
+      "job_id": "autopilot.finops.anomaly_scan:demo-tenant:demo-project:1706745600001",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "requested_at": "2024-02-01T00:00:01Z",
+      "payload": {
+        "operation": "anomaly_scan",
+        "ledger_source": {
+          "type": "file",
+          "path": "./output/ledger-demo-tenant-demo-project.json",
+          "format": "json"
+        },
+        "thresholds": {
+          "refund_spike_threshold_cents": 100000,
+          "dispute_spike_threshold": 5,
+          "payment_failure_spike_threshold": 0.25
+        },
+        "output": {
+          "anomalies_path": "./output/anomalies-demo-tenant-demo-project.json"
+        }
+      },
+      "priority": "high",
+      "max_retries": 3,
+      "timeout_seconds": 300,
+      "metadata": {
+        "generated_by": "finops-autopilot",
+        "version": "1.0.0"
+      }
+    },
+    {
+      "job_type": "autopilot.finops.churn_risk_report",
+      "job_id": "autopilot.finops.churn_risk_report:demo-tenant:demo-project:1706745600002",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "requested_at": "2024-02-01T00:00:02Z",
+      "payload": {
+        "operation": "churn_risk_report",
+        "inputs": {
+          "ledger": {
+            "type": "file",
+            "path": "./output/ledger-demo-tenant-demo-project.json",
+            "format": "json"
+          },
+          "usage_metrics": {
+            "type": "file",
+            "path": "./input/usage-metrics.json",
+            "format": "json"
+          },
+          "support_tickets": {
+            "type": "file",
+            "path": "./input/support-tickets.json",
+            "format": "json"
+          }
+        },
+        "weights": {
+          "payment_failure": 0.3,
+          "usage_drop": 0.25,
+          "support_tickets": 0.2,
+          "plan_downgrade": 0.15,
+          "inactivity": 0.1
+        },
+        "output": {
+          "report_path": "./output/churn-demo-tenant-demo-project.json"
+        }
+      },
+      "priority": "normal",
+      "max_retries": 3,
+      "timeout_seconds": 600,
+      "metadata": {
+        "generated_by": "finops-autopilot",
+        "version": "1.0.0",
+        "note": "Operational insights only - not financial advice"
+      }
+    }
+  ]
+}

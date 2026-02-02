@@ -1,0 +1,135 @@
+[
+  {
+    "event_id": "evt_subscription_001",
+    "event_type": "subscription_created",
+    "timestamp": "2024-01-01T10:00:00Z",
+    "customer_id": "cus_acme_corp",
+    "subscription_id": "sub_acme_001",
+    "amount_cents": 29000,
+    "currency": "USD",
+    "plan_id": "plan_enterprise",
+    "period_start": "2024-01-01T00:00:00Z",
+    "period_end": "2024-02-01T00:00:00Z",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_invoice_001",
+    "event_type": "invoice_paid",
+    "timestamp": "2024-01-01T11:00:00Z",
+    "customer_id": "cus_acme_corp",
+    "subscription_id": "sub_acme_001",
+    "invoice_id": "inv_001",
+    "amount_cents": 29000,
+    "currency": "USD",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_subscription_002",
+    "event_type": "subscription_created",
+    "timestamp": "2024-01-05T14:00:00Z",
+    "customer_id": "cus_startup_xyz",
+    "subscription_id": "sub_xyz_001",
+    "amount_cents": 4900,
+    "currency": "USD",
+    "plan_id": "plan_growth",
+    "period_start": "2024-01-05T00:00:00Z",
+    "period_end": "2024-02-05T00:00:00Z",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_invoice_002",
+    "event_type": "invoice_paid",
+    "timestamp": "2024-01-05T15:00:00Z",
+    "customer_id": "cus_startup_xyz",
+    "subscription_id": "sub_xyz_001",
+    "invoice_id": "inv_002",
+    "amount_cents": 4900,
+    "currency": "USD",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_payment_fail_001",
+    "event_type": "payment_failed",
+    "timestamp": "2024-01-10T09:00:00Z",
+    "customer_id": "cus_startup_xyz",
+    "subscription_id": "sub_xyz_001",
+    "metadata": {
+      "failure_code": "card_declined",
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_payment_fail_002",
+    "event_type": "payment_failed",
+    "timestamp": "2024-01-12T09:00:00Z",
+    "customer_id": "cus_startup_xyz",
+    "subscription_id": "sub_xyz_001",
+    "metadata": {
+      "failure_code": "insufficient_funds",
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_refund_001",
+    "event_type": "invoice_refunded",
+    "timestamp": "2024-01-15T10:00:00Z",
+    "customer_id": "cus_acme_corp",
+    "invoice_id": "inv_001",
+    "amount_cents": 29000,
+    "currency": "USD",
+    "metadata": {
+      "reason": "customer_request",
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_subscription_003",
+    "event_type": "subscription_created",
+    "timestamp": "2024-01-20T08:00:00Z",
+    "customer_id": "cus_dev_agency",
+    "subscription_id": "sub_agency_001",
+    "amount_cents": 9900,
+    "currency": "USD",
+    "plan_id": "plan_agency",
+    "period_start": "2024-01-20T00:00:00Z",
+    "period_end": "2024-02-20T00:00:00Z",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_invoice_003",
+    "event_type": "invoice_paid",
+    "timestamp": "2024-01-20T09:00:00Z",
+    "customer_id": "cus_dev_agency",
+    "subscription_id": "sub_agency_001",
+    "invoice_id": "inv_003",
+    "amount_cents": 9900,
+    "currency": "USD",
+    "metadata": {
+      "source": "stripe"
+    }
+  },
+  {
+    "event_id": "evt_duplicate_001",
+    "event_type": "invoice_paid",
+    "timestamp": "2024-01-20T09:02:00Z",
+    "customer_id": "cus_dev_agency",
+    "subscription_id": "sub_agency_001",
+    "invoice_id": "inv_003",
+    "amount_cents": 9900,
+    "currency": "USD",
+    "metadata": {
+      "note": "This is a duplicate within 5 minutes",
+      "source": "stripe"
+    }
+  }
+]

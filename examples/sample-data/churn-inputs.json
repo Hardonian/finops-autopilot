@@ -1,0 +1,114 @@
+{
+  "description": "Example churn inputs with ledger, usage metrics, and support tickets",
+  "tenant_id": "demo-tenant",
+  "project_id": "demo-project",
+  "ledger": {
+    "tenant_id": "demo-tenant",
+    "project_id": "demo-project",
+    "computed_at": "2024-01-31T23:59:59Z",
+    "customers": {
+      "cus_startup_xyz": {
+        "customer_id": "cus_startup_xyz",
+        "tenant_id": "demo-tenant",
+        "project_id": "demo-project",
+        "subscriptions": [
+          {
+            "subscription_id": "sub_xyz_001",
+            "customer_id": "cus_startup_xyz",
+            "plan_id": "plan_growth",
+            "status": "active",
+            "current_period_start": "2024-01-05T00:00:00Z",
+            "current_period_end": "2024-02-05T00:00:00Z",
+            "mrr_cents": 4900,
+            "currency": "USD",
+            "created_at": "2024-01-05T00:00:00Z"
+          }
+        ],
+        "total_mrr_cents": 4900,
+        "total_paid_cents": 4900,
+        "total_refunded_cents": 0,
+        "total_disputed_cents": 0,
+        "payment_failure_count_30d": 2,
+        "updated_at": "2024-01-31T23:59:59Z"
+      },
+      "cus_acme_corp": {
+        "customer_id": "cus_acme_corp",
+        "tenant_id": "demo-tenant",
+        "project_id": "demo-project",
+        "subscriptions": [],
+        "total_mrr_cents": 0,
+        "total_paid_cents": 0,
+        "total_refunded_cents": 29000,
+        "total_disputed_cents": 0,
+        "payment_failure_count_30d": 0,
+        "updated_at": "2024-01-31T23:59:59Z"
+      },
+      "cus_dev_agency": {
+        "customer_id": "cus_dev_agency",
+        "tenant_id": "demo-tenant",
+        "project_id": "demo-project",
+        "subscriptions": [
+          {
+            "subscription_id": "sub_agency_001",
+            "customer_id": "cus_dev_agency",
+            "plan_id": "plan_agency",
+            "status": "active",
+            "current_period_start": "2024-01-20T00:00:00Z",
+            "current_period_end": "2024-02-20T00:00:00Z",
+            "mrr_cents": 9900,
+            "currency": "USD",
+            "created_at": "2024-01-20T00:00:00Z"
+          }
+        ],
+        "total_mrr_cents": 9900,
+        "total_paid_cents": 19800,
+        "total_refunded_cents": 0,
+        "total_disputed_cents": 0,
+        "payment_failure_count_30d": 0,
+        "last_payment_at": "2024-01-20T09:00:00Z",
+        "updated_at": "2024-01-31T23:59:59Z"
+      }
+    },
+    "total_mrr_cents": 14800,
+    "total_customers": 3,
+    "active_subscriptions": 2,
+    "event_count": 10,
+    "version": "1.0.0"
+  },
+  "usage_metrics": [
+    {
+      "customer_id": "cus_startup_xyz",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "metric_name": "api_calls",
+      "current_value": 1500,
+      "previous_value": 8000,
+      "period_days": 30,
+      "measured_at": "2024-01-31T23:59:59Z"
+    },
+    {
+      "customer_id": "cus_dev_agency",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "metric_name": "api_calls",
+      "current_value": 50000,
+      "previous_value": 45000,
+      "period_days": 30,
+      "measured_at": "2024-01-31T23:59:59Z"
+    }
+  ],
+  "support_tickets": [
+    {
+      "ticket_id": "ticket_001",
+      "customer_id": "cus_startup_xyz",
+      "tenant_id": "demo-tenant",
+      "project_id": "demo-project",
+      "created_at": "2024-01-12T10:00:00Z",
+      "severity": "high",
+      "status": "open",
+      "category": "billing_issue"
+    }
+  ],
+  "plan_downgrades": [],
+  "reference_date": "2024-01-31T23:59:59Z"
+}
