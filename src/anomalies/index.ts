@@ -147,7 +147,8 @@ function detectDuplicateEvents(
           observed_value: existing.length + 1,
           difference: existing.length,
           confidence: 1.0,
-          recommended_action: 'Review event ingestion pipeline for duplicate handling',
+recommended_action: 'Review event ingestion pipeline for duplicate handling',
+          metadata: {},
         };
 
         const validated = AnomalySchema.safeParse(anomaly);
@@ -213,7 +214,8 @@ function detectMissingInvoices(
           observed_value: 0,
           difference: subscription.mrr_cents,
           confidence: 0.8,
-          recommended_action: 'Verify invoice generation and payment collection for this subscription',
+recommended_action: 'Verify invoice generation and payment collection for this subscription',
+          metadata: {},
         };
 
         const validated = AnomalySchema.safeParse(anomaly);
@@ -269,7 +271,8 @@ function detectDoubleCharges(
           observed_value: totalAmount,
           difference: totalAmount - firstAmount,
           confidence: 0.9,
-          recommended_action: 'Immediately review and refund duplicate charges',
+recommended_action: 'Immediately review and refund duplicate charges',
+          metadata: {},
         };
 
         const validated = AnomalySchema.safeParse(anomaly);
@@ -319,7 +322,8 @@ function detectRefundSpikes(
       observed_value: totalRefunds,
       difference: totalRefunds - (totalRevenue * thresholds.refund_spike_threshold_pct) / 100,
       confidence: Math.min(refundPct / thresholds.refund_spike_threshold_pct, 1.0),
-      recommended_action: 'Review refund patterns and identify root cause',
+recommended_action: 'Review refund patterns and identify root cause',
+      metadata: {},
     };
 
     const validated = AnomalySchema.safeParse(anomaly);
@@ -366,7 +370,8 @@ function detectDisputeSpikes(
       observed_value: disputeEvents.length,
       difference: disputeEvents.length - thresholds.dispute_spike_threshold,
       confidence: Math.min(disputeEvents.length / (thresholds.dispute_spike_threshold * 2), 1.0),
-      recommended_action: 'Review fraud patterns and improve dispute prevention',
+recommended_action: 'Review fraud patterns and improve dispute prevention',
+      metadata: {},
     };
 
     const validated = AnomalySchema.safeParse(anomaly);
@@ -409,7 +414,8 @@ function detectPaymentFailureSpikes(
           observed_value: customer.payment_failure_count_30d,
           difference: customer.payment_failure_count_30d - (thresholds.payment_failure_spike_threshold * totalAttempts),
           confidence: failureRate,
-          recommended_action: 'Review payment method and consider customer outreach',
+recommended_action: 'Review payment method and consider customer outreach',
+          metadata: {},
         };
 
         const validated = AnomalySchema.safeParse(anomaly);
@@ -465,7 +471,8 @@ function detectOutOfSequenceEvents(
             description: `Cancel event before create for subscription ${subscriptionId}`,
             affected_events: [event.event_id],
             confidence: 0.9,
-            recommended_action: 'Review event data integrity',
+  recommended_action: 'Review event data integrity',
+            metadata: {},
           };
 
           const validated = AnomalySchema.safeParse(anomaly);
@@ -494,7 +501,8 @@ function detectOutOfSequenceEvents(
           description: `Payment event after cancellation for subscription ${subscriptionId}`,
           affected_events: [event.event_id],
           confidence: 0.6,
-          recommended_action: 'Verify if payment is legitimate or requires refund',
+recommended_action: 'Verify if payment is legitimate or requires refund',
+          metadata: {},
         };
 
         const validated = AnomalySchema.safeParse(anomaly);

@@ -13,6 +13,9 @@ import { z } from 'zod';
 
 export const TenantIdSchema = z.string().min(1).regex(/^[a-z0-9-]+$/);
 export const ProjectIdSchema = z.string().min(1).regex(/^[a-z0-9-_]+$/);
+
+export type TenantId = z.infer<typeof TenantIdSchema>;
+export type ProjectId = z.infer<typeof ProjectIdSchema>;
 export const EventIdSchema = z.string().min(1);
 export const CustomerIdSchema = z.string().min(1);
 export const SubscriptionIdSchema = z.string().min(1);
@@ -199,7 +202,7 @@ export const AnomalySchema = z.object({
   difference: z.number().optional(),
   confidence: z.number().min(0).max(1),
   recommended_action: z.string().optional(),
-  metadata: z.record(z.unknown()).default({}),
+  metadata: z.record(z.unknown()).optional().default({}),
 });
 
 export type AnomalyType = z.infer<typeof AnomalyTypeSchema>;

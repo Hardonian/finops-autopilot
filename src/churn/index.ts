@@ -11,7 +11,6 @@
  */
 
 import type {
-  LedgerState,
   ChurnRisk,
   ChurnSignal,
   ChurnInputs,
@@ -379,7 +378,7 @@ function assessInactivity(
 /**
  * Calculate overall risk score from signals
  */
-function calculateRiskScore(signals: ChurnSignal[], thresholds: ChurnThreshold): number {
+function calculateRiskScore(signals: ChurnSignal[], _thresholds: ChurnThreshold): number {
   if (signals.length === 0) return 0;
 
   // Weighted sum of signal weights

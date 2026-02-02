@@ -132,8 +132,7 @@ export function ingestEvents(
         normalized_at: new Date().toISOString(),
         source_hash: computeEventHash({
           ...baseEvent,
-          normalized_at: '',
-          source_hash: '',
+  normalized_at: '',
           validation_errors: [],
         }),
         validation_errors: parseResult.success 
