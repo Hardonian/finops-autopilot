@@ -20,7 +20,8 @@ import {
   type JobRequestBundle,
   type ReportFinding,
 } from '../contracts/compat.js';
-import type { JobOptions, JobRequest } from './requests.js';
+import type { JobOptions } from './requests.js';
+import type { CompatJobRequest, CompatJobRequestWithIdempotency } from '../contracts/compat.js';
 import { hashCanonical, serializeCanonical, withCanonicalization } from './deterministic.js';
 
 const DEFAULT_SCHEMA_VERSION = JOBFORGE_SCHEMA_VERSION;
@@ -99,9 +100,9 @@ function ensureStableTimestamp(timestamp: string | undefined, stableOutput?: boo
 }
 
 function normalizeJobRequest(
-  job: JobRequest,
+  job: CompatJobRequest,
   options: JobOptions & { traceId: string; stableOutput?: boolean }
-): JobRequest & { idempotency_key: string } {
+): CompatJobRequestWithIdempotency {
   const idempotencyKey = hashCanonical({
     job_type: job.job_type,
     tenant_id: options.tenantId,
@@ -149,7 +150,7 @@ function buildAnalyzeJobRequest(params: {
   projectId: string;
   payload: Record<string, unknown>;
   options: JobOptions & { traceId: string; stableOutput?: boolean };
-}): JobRequest {
+}): CompatJobRequest {
   return {
     job_type: params.jobType,
     job_id: 'pending',
@@ -327,7 +328,7 @@ export function analyze(inputs: AnalyzeInputs, options: AnalyzeOptions = {}): {
       })
     : { risks: [], stats: { totalAssessed: 0, byLevel: { low: 0, medium: 0, high: 0, critical: 0 }, averageScore: 0 } };
 
-  const jobRequests: JobRequest[] = [];
+  const jobRequests: CompatJobRequest[] = [];
   if (parsedInputs.job_requests.reconcile) {
     jobRequests.push(
       buildAnalyzeJobRequest({

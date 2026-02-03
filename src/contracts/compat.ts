@@ -95,3 +95,5 @@ export const JobForgeReportEnvelopeSchema = z.object({
 export type JobRequestBundle = z.infer<typeof JobRequestBundleSchema>;
 export type JobForgeReportEnvelope = z.infer<typeof JobForgeReportEnvelopeSchema>;
 export type ReportFinding = z.infer<typeof ReportFindingSchema>;
+export type CompatJobRequest = z.infer<typeof CompatJobRequestSchema>;
+export type CompatJobRequestWithIdempotency = z.infer<typeof CompatJobRequestWithIdempotencySchema>;
