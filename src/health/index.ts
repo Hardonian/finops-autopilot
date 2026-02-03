@@ -5,11 +5,68 @@
  * - Health check endpoint responses
  * - Capability metadata for runner discovery
  * - DLQ (Dead Letter Queue) semantics documentation
+ * - Capability metadata schema compliance with @autopilot/contracts
  */
+
+import { z } from 'zod';
 
 export const MODULE_ID = 'finops';
 export const MODULE_VERSION = '0.1.0';
 export const SCHEMA_VERSION = '1.0.0';
+
+// ============================================================================
+// Capability Metadata Schemas (Schema Compliance)
+// ============================================================================
+
+export const JobTypeCapabilitySchema = z.object({
+  job_type: z.string(),
+  description: z.string(),
+  input_schema: z.string(),
+  output_schema: z.string(),
+  idempotent: z.boolean(),
+  retryable: z.boolean(),
+  max_retries: z.number().int().min(0),
+  timeout_seconds: z.number().int().min(0),
+  required_context: z.array(z.string()),
+  deterministic: z.boolean().optional(),
+  cacheable: z.boolean().optional(),
+  cache_invalidation_rule: z.string().optional(),
+});
+
+export const DLQSemanticsSchema = z.object({
+  enabled: z.boolean(),
+  max_attempts: z.number().int().min(0),
+  backoff_strategy: z.enum(['exponential', 'linear', 'fixed']),
+  backoff_initial_seconds: z.number().int().min(0),
+  backoff_max_seconds: z.number().int().min(0),
+  dead_letter_destination: z.string().optional(),
+  retryable_errors: z.array(z.string()),
+  non_retryable_errors: z.array(z.string()),
+});
+
+export const CapabilityMetadataSchema = z.object({
+  module_id: z.string(),
+  module_version: z.string(),
+  schema_version: z.string(),
+  job_types: z.array(JobTypeCapabilitySchema),
+  input_formats: z.array(z.string()),
+  output_formats: z.array(z.string()),
+  features: z.array(z.string()),
+  dlq_semantics: DLQSemanticsSchema,
+});
+
+export const HealthStatusSchema = z.object({
+  status: z.enum(['healthy', 'degraded', 'unhealthy']),
+  module_id: z.string(),
+  module_version: z.string(),
+  timestamp: z.string().datetime(),
+  checks: z.object({
+    contracts: z.boolean(),
+    schemas: z.boolean(),
+    profiles: z.boolean(),
+  }),
+  capabilities: z.array(z.string()),
+});
 
 export interface HealthStatus {
   status: 'healthy' | 'degraded' | 'unhealthy';
@@ -45,6 +102,9 @@ export interface JobTypeCapability {
   max_retries: number;
   timeout_seconds: number;
   required_context: string[];
+  deterministic?: boolean;
+  cacheable?: boolean;
+  cache_invalidation_rule?: string;
 }
 
 export interface DLQSemantics {
@@ -126,6 +186,20 @@ export function getCapabilityMetadata(): CapabilityMetadata {
         timeout_seconds: 600,
         required_context: ['tenant_id', 'project_id', 'reference_date'],
       },
+      {
+        job_type: 'autopilot.finops.cost_snapshot',
+        description: 'Generate deterministic cost snapshot for a given period',
+        input_schema: 'CostSnapshotInput',
+        output_schema: 'CostSnapshotReport',
+        idempotent: true,
+        retryable: true,
+        max_retries: 3,
+        timeout_seconds: 300,
+        required_context: ['tenant_id', 'project_id', 'period_start', 'period_end'],
+        deterministic: true,
+        cacheable: true,
+        cache_invalidation_rule: 'period_end < now() - 24h OR explicit_invalidation=true',
+      },
     ],
     input_formats: ['json'],
     output_formats: ['json', 'markdown'],
@@ -166,6 +240,7 @@ export function isSupportedJobType(jobType: string): boolean {
     'autopilot.finops.reconcile',
     'autopilot.finops.anomaly_scan',
     'autopilot.finops.churn_risk_report',
+    'autopilot.finops.cost_snapshot',
   ]);
   return supported.has(jobType);
 }

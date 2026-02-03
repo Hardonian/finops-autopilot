@@ -1,21 +1,30 @@
 /**
  * JobForge compatibility contracts for finops-autopilot.
  *
- * Migration note: Replace these schemas with direct imports from
- * @autopilot/contracts when JobRequestBundle and ReportEnvelope are available.
+ * These schemas extend canonical @autopilot/contracts types for JobForge-specific
+ * bundle formats. Underlying primitive types are imported from canonical contracts
+ * for cross-module consistency.
  */
 
 import { z } from 'zod';
+import {
+  TenantIdSchema,
+  ProjectIdSchema,
+  TimestampSchema,
+} from '@autopilot/contracts';
 
 export const JOBFORGE_SCHEMA_VERSION = '1.0.0';
 
 export const CompatSchemaVersionSchema = z.literal(JOBFORGE_SCHEMA_VERSION);
 export const CompatModuleIdSchema = z.enum(['finops']);
-export const CompatTenantIdSchema = z.string().min(1).regex(/^[a-z0-9-]+$/);
-export const CompatProjectIdSchema = z.string().min(1).regex(/^[a-z0-9-_]+$/);
+
+// Use canonical types for tenant/project IDs
+export const CompatTenantIdSchema = TenantIdSchema;
+export const CompatProjectIdSchema = ProjectIdSchema;
 export const CompatTraceIdSchema = z.string().min(1);
 
-export const CompatTimestampSchema = z.string().datetime();
+// Use canonical timestamp schema
+export const CompatTimestampSchema = TimestampSchema;
 
 export const CompatSeveritySchema = z.enum(['info', 'low', 'medium', 'high', 'critical']);
 

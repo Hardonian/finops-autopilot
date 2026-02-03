@@ -26,6 +26,11 @@ export {
   JobRequestSchema,
   ProfileSchema,
   ChurnInputsSchema,
+  CostSnapshotInputSchema,
+  CostSnapshotReportSchema,
+  CostLineItemSchema,
+  CostBreakdownSchema,
+  CostForecastSchema,
 } from './contracts/index.js';
 
 export type {
@@ -48,6 +53,11 @@ export type {
   ChurnThreshold,
   AnomalyThreshold,
   ChurnInputs,
+  CostSnapshotInput,
+  CostSnapshotReport,
+  CostLineItem,
+  CostBreakdown,
+  CostForecast,
 } from './contracts/index.js';
 
 // Ingest
@@ -130,6 +140,16 @@ export {
   validateProfile,
   serializeProfile,
 } from './profiles/index.js';
+
+// Cost Snapshot (DD CAPABILITY: finops.cost_snapshot)
+export {
+  generateCostSnapshot,
+  shouldInvalidateCache,
+} from './cost-snapshot/index.js';
+
+export type {
+  CostSnapshotOptions,
+} from './cost-snapshot/index.js';
 
 // Health and Capabilities
 export {

@@ -1,5 +1,6 @@
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { analyze, AnalyzeInputsSchema } from '../src/jobforge/index.js';
 import {
   JobForgeReportEnvelopeSchema,
@@ -8,6 +9,8 @@ import {
 } from '../src/contracts/compat.js';
 import { hashCanonical, serializeCanonical } from '../src/jobforge/deterministic.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const root = resolve(__dirname, '..');
 const fixturesRoot = resolve(root, 'fixtures', 'jobforge');
 

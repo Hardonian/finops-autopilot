@@ -422,3 +422,73 @@ export const ChurnInputsSchema = z.object({
 export type UsageMetrics = z.infer<typeof UsageMetricsSchema>;
 export type SupportTicket = z.infer<typeof SupportTicketSchema>;
 export type ChurnInputs = z.infer<typeof ChurnInputsSchema>;
+
+// ============================================================================
+// Cost Snapshot (deterministic output, cacheable)
+// ============================================================================
+
+export const CostSnapshotInputSchema = z.object({
+  tenant_id: TenantIdSchema,
+  project_id: ProjectIdSchema,
+  period_start: TimestampSchema,
+  period_end: TimestampSchema,
+  ledger: LedgerStateSchema.optional(),
+  billing_events: z.array(BillingEventSchema).optional(),
+  include_breakdown: z.boolean().default(true),
+  include_forecast: z.boolean().default(false),
+});
+
+export const CostLineItemSchema = z.object({
+  category: z.enum(['subscription', 'usage', 'refund', 'dispute', 'other']),
+  customer_id: CustomerIdSchema.optional(),
+  subscription_id: SubscriptionIdSchema.optional(),
+  amount_cents: z.number().int(),
+  currency: CurrencySchema,
+  description: z.string(),
+});
+
+export const CostBreakdownSchema = z.object({
+  by_category: z.record(z.string(), z.number().int()),
+  by_customer: z.record(CustomerIdSchema, z.number().int()).optional(),
+  by_subscription: z.record(SubscriptionIdSchema, z.number().int()).optional(),
+  line_items: z.array(CostLineItemSchema),
+});
+
+export const CostForecastSchema = z.object({
+  projected_period_start: TimestampSchema,
+  projected_period_end: TimestampSchema,
+  projected_cost_cents: z.number().int(),
+  confidence_interval: z.object({
+    lower_cents: z.number().int(),
+    upper_cents: z.number().int(),
+  }),
+  factors: z.array(z.string()),
+});
+
+export const CostSnapshotReportSchema = z.object({
+  tenant_id: TenantIdSchema,
+  project_id: ProjectIdSchema,
+  report_id: z.string(),
+  period_start: TimestampSchema,
+  period_end: TimestampSchema,
+  generated_at: TimestampSchema,
+  total_cost_cents: z.number().int(),
+  currency: CurrencySchema,
+  breakdown: CostBreakdownSchema,
+  forecast: CostForecastSchema.optional(),
+  metadata: z.object({
+    event_count: z.number().int(),
+    customer_count: z.number().int(),
+    subscription_count: z.number().int(),
+    deterministic: z.literal(true),
+    cacheable: z.literal(true),
+    cache_key: z.string(),
+  }),
+  version: z.string().default('1.0.0'),
+});
+
+export type CostSnapshotInput = z.infer<typeof CostSnapshotInputSchema>;
+export type CostLineItem = z.infer<typeof CostLineItemSchema>;
+export type CostBreakdown = z.infer<typeof CostBreakdownSchema>;
+export type CostForecast = z.infer<typeof CostForecastSchema>;
+export type CostSnapshotReport = z.infer<typeof CostSnapshotReportSchema>;
