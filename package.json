@@ -24,7 +24,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "ci": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build",
+    "verify:fast": "pnpm run lint && pnpm run typecheck && pnpm run build",
+    "verify:full": "pnpm run verify:fast && pnpm run test",
+    "docs:verify": "pnpm run build && tsx scripts/docs-verify.ts",
+    "ci": "pnpm run verify:full",
     "runnerless:audit": "autopilot-audit runnerless . || echo 'Install @autopilot/runnerless-audit globally'",
     "prepublishOnly": "pnpm run build"
   },

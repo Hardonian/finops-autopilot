@@ -1,0 +1,57 @@
+{
+  "schema_version": "1.0.0",
+  "module_id": "finops",
+  "tenant_id": "tenant-demo",
+  "project_id": "project-demo",
+  "trace_id": "trace-demo",
+  "period_start": "2024-01-01T00:00:00.000Z",
+  "period_end": "2024-01-31T23:59:59.999Z",
+  "billing_events": [
+    {
+      "tenant_id": "tenant-demo",
+      "project_id": "project-demo",
+      "event_id": "evt_001",
+      "event_type": "subscription_created",
+      "timestamp": "2024-01-05T12:00:00.000Z",
+      "customer_id": "cus_demo",
+      "subscription_id": "sub_demo",
+      "amount_cents": 5000,
+      "currency": "USD",
+      "plan_id": "plan_basic",
+      "period_start": "2024-01-01T00:00:00.000Z",
+      "period_end": "2024-02-01T00:00:00.000Z",
+      "metadata": {},
+      "raw_payload": {
+        "source": "fixture"
+      }
+    },
+    {
+      "tenant_id": "tenant-demo",
+      "project_id": "project-demo",
+      "event_id": "evt_002",
+      "event_type": "invoice_paid",
+      "timestamp": "2024-01-10T12:00:00.000Z",
+      "customer_id": "cus_demo",
+      "subscription_id": "sub_demo",
+      "invoice_id": "inv_demo",
+      "amount_cents": 5000,
+      "currency": "USD",
+      "metadata": {},
+      "raw_payload": {
+        "source": "fixture"
+      }
+    }
+  ],
+  "job_requests": {
+    "reconcile": {
+      "events_path": "./fixtures/jobforge/events.json"
+    },
+    "anomaly_scan": {
+      "ledger_path": "./fixtures/jobforge/ledger.json"
+    },
+    "churn_risk": {
+      "ledger_path": "./fixtures/jobforge/ledger.json",
+      "usage_metrics_path": "./fixtures/jobforge/usage-metrics.json"
+    }
+  }
+}

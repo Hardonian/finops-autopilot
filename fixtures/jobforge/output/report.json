@@ -1,0 +1,33 @@
+{
+  "canonicalization": {
+    "algorithm": "sha256",
+    "canonical_format": "json-stable",
+    "canonical_hash": "19099764fc45c8c26c1f33848137909904d1290ff5f9aa6d566c42ec6039936f"
+  },
+  "findings": [],
+  "generated_at": "1970-01-01T00:00:00.000Z",
+  "metadata": {
+    "event_envelope_count": 0,
+    "run_manifest_count": 0
+  },
+  "module_id": "finops",
+  "project_id": "project-demo",
+  "recommendations": [],
+  "report_id": "finops-report-001fcc70100e",
+  "report_type": "finops",
+  "schema_version": "1.0.0",
+  "summary": {
+    "anomaly_count": 0,
+    "churn_risk_count": 0,
+    "event_count": 2,
+    "job_request_count": 3,
+    "ledger_customer_count": 1,
+    "ledger_mrr_cents": 5000,
+    "normalized_event_count": 2,
+    "period_end": "2024-01-31T23:59:59.999Z",
+    "period_start": "2024-01-01T00:00:00.000Z",
+    "reconciliation_discrepancies": 0
+  },
+  "tenant_id": "tenant-demo",
+  "trace_id": "trace-demo"
+}

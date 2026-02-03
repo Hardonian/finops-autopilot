@@ -10,14 +10,17 @@
  */
 
 import { Command } from 'commander';
-import { readFileSync, writeFileSync, existsSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { ingestEvents, serializeEvents } from './ingest/index.js';
 import { buildLedger, reconcileMrr } from './reconcile/index.js';
 import { detectAnomalies } from './anomalies/index.js';
 import { assessChurnRisk } from './churn/index.js';
 import { getProfile } from './profiles/index.js';
+import { redactObject } from './contracts/index.js';
 import type { ChurnInputs, NormalizedEvent } from './contracts/index.js';
+import { analyze, renderReport, AnalyzeInputsSchema } from './jobforge/index.js';
+import { serializeCanonical } from './jobforge/deterministic.js';
 
 const program = new Command();
 
@@ -30,6 +33,7 @@ program
 program
   .command('ingest')
   .description('Ingest and normalize billing events')
+  .addHelpText('after', '\nExample:\n  finops ingest --events ./billing-events.json --tenant my-tenant --project my-project\n')
   .requiredOption('--events <path>', 'Path to billing events JSON file')
   .option('--tenant <id>', 'Tenant ID', 'default')
   .option('--project <id>', 'Project ID', 'default')
@@ -85,8 +89,7 @@ program
         }
       }
     } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      process.exit(1);
+      handleCliError(err);
     }
   });
 
@@ -94,6 +97,7 @@ program
 program
   .command('reconcile')
   .description('Reconcile MRR from normalized events')
+  .addHelpText('after', '\nExample:\n  finops reconcile --normalized ./normalized.json --tenant my-tenant --project my-project\n')
   .requiredOption('--normalized <path>', 'Path to normalized events JSON file')
   .option('--tenant <id>', 'Tenant ID', 'default')
   .option('--project <id>', 'Project ID', 'default')
@@ -162,8 +166,7 @@ program
         console.log(`\n  Written to: ${outputPath}`);
       }
     } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      process.exit(1);
+      handleCliError(err);
     }
   });
 
@@ -171,6 +174,7 @@ program
 program
   .command('anomalies')
   .description('Detect anomalies in ledger data')
+  .addHelpText('after', '\nExample:\n  finops anomalies --ledger ./ledger.json --tenant my-tenant --project my-project\n')
   .requiredOption('--ledger <path>', 'Path to ledger JSON file')
   .option('--tenant <id>', 'Tenant ID', 'default')
   .option('--project <id>', 'Project ID', 'default')
@@ -223,8 +227,7 @@ program
         console.log(`\n  Written to: ${outputPath}`);
       }
     } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      process.exit(1);
+      handleCliError(err);
     }
   });
 
@@ -232,6 +235,7 @@ program
 program
   .command('churn')
   .description('Assess churn risk for customers')
+  .addHelpText('after', '\nExample:\n  finops churn --inputs ./churn-inputs.json --tenant my-tenant --project my-project\n')
   .requiredOption('--inputs <path>', 'Path to churn inputs JSON file')
   .option('--tenant <id>', 'Tenant ID', 'default')
   .option('--project <id>', 'Project ID', 'default')
@@ -280,8 +284,61 @@ program
         console.log(`\n  Written to: ${outputPath}`);
       }
     } catch (err) {
-      console.error(`Error: ${err instanceof Error ? err.message : 'Unknown error'}`);
-      process.exit(1);
+      handleCliError(err);
+    }
+  });
+
+// JobForge analyze command
+program
+  .command('analyze')
+  .description('Generate JobForge request bundle and report (dry-run only)')
+  .addHelpText('after', '\nExample:\n  finops analyze --inputs ./fixtures/jobforge/input.json --tenant my-tenant --project my-project --trace trace-1 --out ./out/jobforge --stable-output\n')
+  .requiredOption('--inputs <path>', 'Path to analyze inputs JSON file')
+  .requiredOption('--tenant <id>', 'Tenant ID')
+  .requiredOption('--project <id>', 'Project ID')
+  .requiredOption('--trace <id>', 'Trace ID')
+  .requiredOption('--out <dir>', 'Output directory for JobForge artifacts')
+  .option('--stable-output', 'Produce deterministic output for fixtures/docs', false)
+  .option('--no-markdown', 'Skip writing report.md')
+  .action((options) => {
+    try {
+      const inputsPath = resolve(options.inputs);
+      if (!existsSync(inputsPath)) {
+        console.error(`Error: Inputs file not found: ${inputsPath}`);
+        process.exit(1);
+      }
+
+      const rawInputs = JSON.parse(readFileSync(inputsPath, 'utf-8')) as Record<string, unknown>;
+      const mergedInputs = {
+        ...rawInputs,
+        tenant_id: options.tenant,
+        project_id: options.project,
+        trace_id: options.trace,
+      };
+
+      const parsed = AnalyzeInputsSchema.safeParse(mergedInputs);
+      if (!parsed.success) {
+        console.error(`Validation error: ${parsed.error.errors.map((e) => e.message).join('; ')}`);
+        process.exit(2);
+      }
+
+      const { jobRequestBundle, reportEnvelope } = analyze(parsed.data, {
+        stableOutput: options.stableOutput,
+      });
+
+      const outputDir = resolve(options.out);
+      mkdirSync(outputDir, { recursive: true });
+
+      writeFileSync(resolve(outputDir, 'request-bundle.json'), serializeCanonical(jobRequestBundle), 'utf-8');
+      writeFileSync(resolve(outputDir, 'report.json'), serializeCanonical(reportEnvelope), 'utf-8');
+
+      if (options.markdown) {
+        writeFileSync(resolve(outputDir, 'report.md'), renderReport(reportEnvelope, 'md'), 'utf-8');
+      }
+
+      console.log(`JobForge artifacts written to ${outputDir}`);
+    } catch (err) {
+      handleCliError(err);
     }
   });
 
@@ -302,3 +359,18 @@ function getLastDayOfMonth(): string {
 }
 
 program.parse();
+
+function handleCliError(err: unknown, exitCode = 1): void {
+  const message = formatError(err);
+  if (process.env.DEBUG && err instanceof Error) {
+    console.error(err.stack);
+  }
+  console.error(`Error: ${message}`);
+  process.exit(exitCode);
+}
+
+function formatError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  const redacted = redactObject({ message }) as { message?: string };
+  return redacted.message ?? 'Unknown error';
+}

@@ -1,0 +1,113 @@
+{
+  "canonicalization": {
+    "algorithm": "sha256",
+    "canonical_format": "json-stable",
+    "canonical_hash": "6aa8c0037080e5900c3b8e7d65fb99fc96d0dec8d2031749f726f2e21ec3cb8e"
+  },
+  "metadata": {
+    "job_count": 3
+  },
+  "module_id": "finops",
+  "project_id": "project-demo",
+  "requests": [
+    {
+      "idempotency_key": "acb55eb487e9858329c6a68afd85274a93c66bd2de27d26876dc8065ede62deb",
+      "job_id": "job-acb55eb487e98583",
+      "job_type": "autopilot.finops.anomaly_scan",
+      "max_retries": 3,
+      "metadata": {
+        "job_type_status": "AVAILABLE",
+        "jobforge_dry_run": true,
+        "module_id": "finops",
+        "requires_policy_token": false,
+        "trace_id": "trace-demo"
+      },
+      "payload": {
+        "ledger_source": {
+          "format": "json",
+          "path": "./fixtures/jobforge/ledger.json",
+          "type": "file"
+        },
+        "operation": "anomaly_scan",
+        "output": {
+          "anomalies_path": "./output/anomalies-tenant-demo-project-demo.json"
+        }
+      },
+      "priority": "normal",
+      "project_id": "project-demo",
+      "requested_at": "1970-01-01T00:00:00.000Z",
+      "tenant_id": "tenant-demo",
+      "timeout_seconds": 300
+    },
+    {
+      "idempotency_key": "55efe2ee5f4b6b1495779da1497bd2b74d7566cfeac54b74b112996df62a3299",
+      "job_id": "job-55efe2ee5f4b6b14",
+      "job_type": "autopilot.finops.churn_risk_report",
+      "max_retries": 3,
+      "metadata": {
+        "job_type_status": "AVAILABLE",
+        "jobforge_dry_run": true,
+        "module_id": "finops",
+        "requires_policy_token": false,
+        "trace_id": "trace-demo"
+      },
+      "payload": {
+        "inputs": {
+          "ledger": {
+            "format": "json",
+            "path": "./fixtures/jobforge/ledger.json",
+            "type": "file"
+          },
+          "usage_metrics": {
+            "format": "json",
+            "path": "./fixtures/jobforge/usage-metrics.json",
+            "type": "file"
+          }
+        },
+        "operation": "churn_risk_report",
+        "output": {
+          "report_path": "./output/churn-tenant-demo-project-demo.json"
+        }
+      },
+      "priority": "normal",
+      "project_id": "project-demo",
+      "requested_at": "1970-01-01T00:00:00.000Z",
+      "tenant_id": "tenant-demo",
+      "timeout_seconds": 600
+    },
+    {
+      "idempotency_key": "11c9dbd33de9f3491727cf61914f3706a5e54d7060082eacceb8137ed0a484a7",
+      "job_id": "job-11c9dbd33de9f349",
+      "job_type": "autopilot.finops.reconcile",
+      "max_retries": 3,
+      "metadata": {
+        "job_type_status": "AVAILABLE",
+        "jobforge_dry_run": true,
+        "module_id": "finops",
+        "requires_policy_token": false,
+        "trace_id": "trace-demo"
+      },
+      "payload": {
+        "events_source": {
+          "format": "json",
+          "path": "./fixtures/jobforge/events.json",
+          "type": "file"
+        },
+        "operation": "reconcile",
+        "output": {
+          "ledger_path": "./output/ledger-tenant-demo-project-demo.json",
+          "report_path": "./output/recon-tenant-demo-project-demo.json"
+        },
+        "period_end": "2024-01-31T23:59:59.999Z",
+        "period_start": "2024-01-01T00:00:00.000Z"
+      },
+      "priority": "normal",
+      "project_id": "project-demo",
+      "requested_at": "1970-01-01T00:00:00.000Z",
+      "tenant_id": "tenant-demo",
+      "timeout_seconds": 300
+    }
+  ],
+  "schema_version": "1.0.0",
+  "trace_id": "trace-demo"
+}

@@ -104,10 +104,16 @@ export {
   createJobFromChurnRisks,
   serializeJobRequest,
   serializeJobRequests,
+  analyze,
+  validateBundle,
+  renderReport,
+  AnalyzeInputsSchema,
 } from './jobforge/index.js';
 
 export type {
   JobOptions,
+  AnalyzeInputs,
+  AnalyzeOptions,
 } from './jobforge/index.js';
 
 // Profiles
