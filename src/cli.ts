@@ -17,7 +17,13 @@ import { buildLedger, reconcileMrr } from './reconcile/index.js';
 import { detectAnomalies } from './anomalies/index.js';
 import { assessChurnRisk } from './churn/index.js';
 import { getProfile } from './profiles/index.js';
-import { redactObject } from './contracts/index.js';
+import { 
+  validateSafePath, 
+  safeJsonParse, 
+  validateTenantContext
+} from './security/index.js';
+import { getHealthStatus, getCapabilityMetadata } from './health/index.js';
+
 import type { ChurnInputs, NormalizedEvent } from './contracts/index.js';
 import { analyze, renderReport, AnalyzeInputsSchema } from './jobforge/index.js';
 import { serializeCanonical } from './jobforge/deterministic.js';
@@ -41,13 +47,35 @@ program
   .option('--skip-validation', 'Skip validation and include invalid events', false)
   .action((options) => {
     try {
-      const eventsPath = resolve(options.events);
-      if (!existsSync(eventsPath)) {
-        console.error(`Error: Events file not found: ${eventsPath}`);
+      // Validate tenant context
+      const tenantValidation = validateTenantContext(options.tenant, options.project);
+      if (!tenantValidation.valid) {
+        console.error(`Security Error: ${tenantValidation.error}`);
         process.exit(1);
       }
 
-      const rawEvents = JSON.parse(readFileSync(eventsPath, 'utf-8'));
+      // Validate path security
+      const pathValidation = validateSafePath(options.events);
+      if (!pathValidation.valid) {
+        console.error(`Security Error: ${pathValidation.error}`);
+        process.exit(1);
+      }
+
+      const eventsPath = resolve(options.events);
+      if (!existsSync(eventsPath)) {
+        console.error(`Error: Events file not found`);
+        process.exit(1);
+      }
+
+      // Safe JSON parsing
+      const fileContent = readFileSync(eventsPath, 'utf-8');
+      const parseResult = safeJsonParse<unknown[]>(fileContent);
+      if (!parseResult.success) {
+        console.error(`Error: ${parseResult.error}`);
+        process.exit(1);
+      }
+
+      const rawEvents = parseResult.data;
       
       if (!Array.isArray(rawEvents)) {
         console.error('Error: Events file must contain an array of events');
@@ -288,6 +316,39 @@ program
     }
   });
 
+// Health check command
+program
+  .command('health')
+  .description('Display module health status and capabilities')
+  .option('--json', 'Output as JSON')
+  .action((options) => {
+    try {
+      const health = getHealthStatus();
+      const capabilities = getCapabilityMetadata();
+      
+      if (options.json) {
+        console.log(JSON.stringify({ health, capabilities }, null, 2));
+      } else {
+        console.log('\nHealth Status:');
+        console.log(`  Module: ${health.module_id}@${health.module_version}`);
+        console.log(`  Status: ${health.status}`);
+        console.log(`  Timestamp: ${health.timestamp}`);
+        console.log(`  Checks: contracts=${health.checks.contracts}, schemas=${health.checks.schemas}, profiles=${health.checks.profiles}`);
+        console.log('\nCapabilities:');
+        console.log(`  Job Types: ${capabilities.job_types.map(j => j.job_type).join(', ')}`);
+        console.log(`  Input Formats: ${capabilities.input_formats.join(', ')}`);
+        console.log(`  Output Formats: ${capabilities.output_formats.join(', ')}`);
+        console.log(`  Features: ${capabilities.features.join(', ')}`);
+        console.log(`\nDLQ Semantics:`);
+        console.log(`  Enabled: ${capabilities.dlq_semantics.enabled}`);
+        console.log(`  Max Attempts: ${capabilities.dlq_semantics.max_attempts}`);
+        console.log(`  Backoff: ${capabilities.dlq_semantics.backoff_strategy}`);
+      }
+    } catch (err) {
+      handleCliError(err);
+    }
+  });
+
 // JobForge analyze command
 program
   .command('analyze')
@@ -371,6 +432,5 @@ function handleCliError(err: unknown, exitCode = 1): void {
 
 function formatError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
-  const redacted = redactObject({ message }) as { message?: string };
-  return redacted.message ?? 'Unknown error';
+  return message ?? 'Unknown error';
 }

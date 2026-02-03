@@ -1,7 +1,11 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { JobRequestBundleSchema, JobForgeReportEnvelopeSchema } from '../contracts/compat.js';
+import {
+  JobRequestBundleSchema,
+  JobForgeReportEnvelopeSchema,
+  type JobRequestBundle,
+} from '../contracts/compat.js';
 import { validateBundle } from '../jobforge/integration.js';
 import { hashCanonical } from '../jobforge/deterministic.js';
 
@@ -12,9 +16,13 @@ function readJson<T>(relativePath: string): T {
   return JSON.parse(raw) as T;
 }
 
+function readBundle(relativePath: string): JobRequestBundle {
+  return readJson<JobRequestBundle>(relativePath);
+}
+
 describe('JobForge integration fixtures', () => {
   it('validates the request bundle fixture', () => {
-    const bundle = readJson('request-bundle.json');
+    const bundle = readBundle('request-bundle.json');
     const parsed = JobRequestBundleSchema.safeParse(bundle);
     expect(parsed.success).toBe(true);
   });
@@ -26,8 +34,8 @@ describe('JobForge integration fixtures', () => {
   });
 
   it('ensures canonical hashes match the payload content', () => {
-    const bundle = readJson('request-bundle.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
-    const report = readJson('report.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
+    const bundle = readJson<{ canonicalization: { canonical_hash: string } }>('request-bundle.json');
+    const report = readJson<{ canonicalization: { canonical_hash: string } }>('report.json');
 
     const { canonicalization: bundleCanonical, ...bundlePayload } = bundle;
     const { canonicalization: reportCanonical, ...reportPayload } = report;
@@ -37,7 +45,7 @@ describe('JobForge integration fixtures', () => {
   });
 
   it('passes JobForge preflight validation rules', () => {
-    const bundle = readJson('request-bundle.json');
+    const bundle = readBundle('request-bundle.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(true);
   });
@@ -45,31 +53,31 @@ describe('JobForge integration fixtures', () => {
 
 describe('JobForge negative fixtures', () => {
   it('fails when tenant_id is missing', () => {
-    const bundle = readJson('negative/bundle-missing-tenant.json');
+    const bundle = readBundle('negative/bundle-missing-tenant.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
   });
 
   it('fails when project_id is missing', () => {
-    const bundle = readJson('negative/bundle-missing-project.json');
+    const bundle = readBundle('negative/bundle-missing-project.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
   });
 
   it('fails on wrong schema_version', () => {
-    const bundle = readJson('negative/bundle-wrong-schema.json');
+    const bundle = readBundle('negative/bundle-wrong-schema.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
   });
 
   it('fails when idempotency_key is missing', () => {
-    const bundle = readJson('negative/bundle-missing-idempotency.json');
+    const bundle = readBundle('negative/bundle-missing-idempotency.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
   });
 
   it('fails when action request lacks policy token annotation', () => {
-    const bundle = readJson('negative/bundle-action-without-policy.json');
+    const bundle = readBundle('negative/bundle-action-without-policy.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
     expect(result.errors.some((err) => err.includes('policy token'))).toBe(true);

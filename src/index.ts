@@ -130,3 +130,21 @@ export {
   validateProfile,
   serializeProfile,
 } from './profiles/index.js';
+
+// Health and Capabilities
+export {
+  getHealthStatus,
+  getCapabilityMetadata,
+  isSupportedJobType,
+  getRetryPolicy,
+  MODULE_ID,
+  MODULE_VERSION,
+  SCHEMA_VERSION,
+} from './health/index.js';
+
+export type {
+  HealthStatus,
+  CapabilityMetadata,
+  JobTypeCapability,
+  DLQSemantics,
+} from './health/index.js';

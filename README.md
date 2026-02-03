@@ -162,4 +162,4 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
 ## License
 
-MIT © AnomalyCo
+Apache-2.0 © AnomalyCo
