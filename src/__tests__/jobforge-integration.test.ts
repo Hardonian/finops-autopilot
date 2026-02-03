@@ -14,20 +14,20 @@ function readJson<T>(relativePath: string): T {
 
 describe('JobForge integration fixtures', () => {
   it('validates the request bundle fixture', () => {
-    const bundle = readJson('output/request-bundle.json');
+    const bundle = readJson('request-bundle.json');
     const parsed = JobRequestBundleSchema.safeParse(bundle);
     expect(parsed.success).toBe(true);
   });
 
   it('validates the report fixture', () => {
-    const report = readJson('output/report.json');
+    const report = readJson('report.json');
     const parsed = JobForgeReportEnvelopeSchema.safeParse(report);
     expect(parsed.success).toBe(true);
   });
 
   it('ensures canonical hashes match the payload content', () => {
-    const bundle = readJson('output/request-bundle.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
-    const report = readJson('output/report.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
+    const bundle = readJson('request-bundle.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
+    const report = readJson('report.json') as { canonicalization: { canonical_hash: string } } & Record<string, unknown>;
 
     const { canonicalization: bundleCanonical, ...bundlePayload } = bundle;
     const { canonicalization: reportCanonical, ...reportPayload } = report;
@@ -37,7 +37,7 @@ describe('JobForge integration fixtures', () => {
   });
 
   it('passes JobForge preflight validation rules', () => {
-    const bundle = readJson('output/request-bundle.json');
+    const bundle = readJson('request-bundle.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(true);
   });
@@ -46,6 +46,12 @@ describe('JobForge integration fixtures', () => {
 describe('JobForge negative fixtures', () => {
   it('fails when tenant_id is missing', () => {
     const bundle = readJson('negative/bundle-missing-tenant.json');
+    const result = validateBundle(bundle);
+    expect(result.success).toBe(false);
+  });
+
+  it('fails when project_id is missing', () => {
+    const bundle = readJson('negative/bundle-missing-project.json');
     const result = validateBundle(bundle);
     expect(result.success).toBe(false);
   });

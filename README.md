@@ -26,7 +26,7 @@ finops analyze --inputs ./fixtures/jobforge/input.json --tenant my-tenant --proj
 
 ## JobForge Integration
 
-This module emits JobForge-compatible request bundles and reports without executing any jobs.
+This module emits JobForge-compatible request bundles and reports without executing any jobs. It never executes jobs; it only emits request bundles for JobForge to run.
 
 ```bash
 finops analyze \
@@ -42,6 +42,16 @@ Artifacts written:
 - `request-bundle.json`
 - `report.json`
 - `report.md` (optional)
+
+Each artifact is deterministic in `--stable-output` mode and includes `schema_version` `1.0.0` plus a canonical SHA-256 hash.
+
+To export stable fixtures for integration tests:
+
+```bash
+pnpm run fixtures:export
+```
+
+Fixtures are written to `fixtures/jobforge/request-bundle.json`, `fixtures/jobforge/report.json`, and `fixtures/jobforge/report.md`.
 
 See [`docs/jobforge-integration.md`](./docs/jobforge-integration.md) for the full integration contract and validation steps.
 
