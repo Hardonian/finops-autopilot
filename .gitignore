@@ -34,4 +34,4 @@ pnpm-debug.log*
 Thumbs.db
 
 # Examples output (generated)
-examples/output/
+# (tracked for docs verification)

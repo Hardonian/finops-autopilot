@@ -14,14 +14,46 @@ pnpm install
 
 # Build and verify
 pnpm run build
-pnpm run check
+pnpm run verify:fast
 
 # CLI usage
 finops ingest --events ./billing-events.json --tenant my-tenant --project my-project
 finops reconcile --normalized ./normalized.json --tenant my-tenant --project my-project
 finops anomalies --ledger ./ledger.json --tenant my-tenant --project my-project
 finops churn --inputs ./churn-inputs.json --tenant my-tenant --project my-project
+finops analyze --inputs ./fixtures/jobforge/input.json --tenant my-tenant --project my-project --trace trace-1 --out ./out/jobforge
 ```
+
+## JobForge Integration
+
+This module emits JobForge-compatible request bundles and reports without executing any jobs.
+
+```bash
+finops analyze \
+  --inputs ./fixtures/jobforge/input.json \
+  --tenant tenant-demo \
+  --project project-demo \
+  --trace trace-demo \
+  --out ./out/jobforge \
+  --stable-output
+```
+
+Artifacts written:
+- `request-bundle.json`
+- `report.json`
+- `report.md` (optional)
+
+See [`docs/jobforge-integration.md`](./docs/jobforge-integration.md) for the full integration contract and validation steps.
+
+## CLI Commands
+
+| Command | Description |
+| --- | --- |
+| `finops ingest` | Normalize billing event exports |
+| `finops reconcile` | Build ledger + reconcile MRR |
+| `finops anomalies` | Detect anomalies from ledger data |
+| `finops churn` | Assess churn risk signals |
+| `finops analyze` | Emit JobForge bundle + report (dry-run) |
 
 ## Architecture
 
@@ -94,6 +126,9 @@ Pre-configured profiles available:
 pnpm run test              # Run all tests
 pnpm run test:coverage     # Run with coverage
 pnpm run test:watch        # Watch mode
+pnpm run verify:fast       # Lint + typecheck + build
+pnpm run verify:full       # verify:fast + test
+pnpm run docs:verify       # CLI + docs verification
 ```
 
 ## Examples
@@ -102,14 +137,14 @@ See `examples/` directory for sample data and usage patterns:
 - `examples/sample-data/billing-events.json` - Sample billing export
 - `examples/sample-data/churn-inputs.json` - Churn assessment inputs
 - `examples/sample-data/job-requests.json` - JobForge job request examples
+- `examples/jobforge/input.json` - JobForge analyze inputs
+- `examples/output/jobforge/` - JobForge analyze outputs (stable mode)
 
 ## CI/CD
 
 GitHub Actions workflow included:
-- Lint with ESLint
-- Type checking with TypeScript
-- Unit tests with Vitest
-- Build verification
+- `verify:fast` on pull requests
+- `verify:full` and `docs:verify` on main
 
 ## Contributing
 

@@ -56,6 +56,19 @@ export {
 } from '@autopilot/contracts';
 
 // ============================================================================
+// JobForge Compatibility Contracts (local shim)
+// ============================================================================
+
+export {
+  JobRequestBundleSchema,
+  JobForgeReportEnvelopeSchema,
+  ReportFindingSchema,
+  type JobRequestBundle,
+  type JobForgeReportEnvelope,
+  type ReportFinding,
+} from './compat.js';
+
+// ============================================================================
 // Primitive Types
 // ============================================================================
 
