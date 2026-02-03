@@ -259,7 +259,7 @@ export function generateCostSnapshot(
   // Check evidence strength (truthcore validation)
   const evidenceCheck = checkEvidenceStrength(parsedInput, events);
   if (!evidenceCheck.valid) {
-    return { refusal: evidenceCheck.refusalReason! };
+    return { refusal: evidenceCheck.refusalReason ?? 'UNKNOWN_ERROR' };
   }
   
   // Determine currency (default to USD if not specified)
