@@ -108,9 +108,8 @@ export function ingestEvents(
   const errors: IngestError[] = [];
   const byType: Record<string, number> = {};
   
-  // Pre-allocate array capacity for better performance
-  const expectedSize = rawEvents.length;
-  events.length = 0; // Ensure we start fresh
+  // Ensure we start fresh with proper capacity hint
+  events.length = 0;
 
   for (let index = 0; index < rawEvents.length; index++) {
     const raw = rawEvents[index];
