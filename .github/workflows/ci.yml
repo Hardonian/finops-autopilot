@@ -21,6 +21,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify:fast
+      - run: pnpm run contracts:compat
 
   verify-full:
     if: github.event_name == 'push'
@@ -36,6 +37,7 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: pnpm run verify:full
+      - run: pnpm run contracts:compat
 
   docs-verify:
     if: github.event_name == 'push'

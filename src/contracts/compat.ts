@@ -7,7 +7,9 @@
 
 import { z } from 'zod';
 
-export const CompatSchemaVersionSchema = z.string().min(1);
+export const JOBFORGE_SCHEMA_VERSION = '1.0.0';
+
+export const CompatSchemaVersionSchema = z.literal(JOBFORGE_SCHEMA_VERSION);
 export const CompatModuleIdSchema = z.enum(['finops']);
 export const CompatTenantIdSchema = z.string().min(1).regex(/^[a-z0-9-]+$/);
 export const CompatProjectIdSchema = z.string().min(1).regex(/^[a-z0-9-_]+$/);

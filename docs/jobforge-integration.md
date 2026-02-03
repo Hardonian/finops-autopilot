@@ -24,12 +24,24 @@ The command writes the following files:
 
 Each output includes:
 
-- `schema_version`
+- `schema_version` (`1.0.0`)
 - `module_id` (`finops`)
 - `tenant_id` and `project_id`
 - `trace_id`
 - per-request `idempotency_key`
 - canonicalization metadata with a stable SHA-256 hash
+
+Stable fixtures can be exported with:
+
+```bash
+pnpm run fixtures:export
+```
+
+This writes deterministic artifacts to:
+
+- `fixtures/jobforge/request-bundle.json`
+- `fixtures/jobforge/report.json`
+- `fixtures/jobforge/report.md`
 
 ## How JobForge should ingest and validate
 
@@ -40,6 +52,10 @@ Each output includes:
    - action-like requests include `requires_policy_token: true` in metadata
 3. Read `report.json` and validate against `ReportEnvelope` (compat schema included in `src/contracts/compat.ts`).
 4. Use the canonicalization hash for deterministic storage and dedupe.
+
+## Contract alignment
+
+`src/contracts/compat.ts` mirrors the canonical `@autopilot/contracts` JobForge schemas and pins to `schema_version` `1.0.0`. Alignment is verified by `pnpm run contracts:compat`, which regenerates stable outputs from fixtures and asserts the canonical hashes and snapshot fixtures remain byte-for-byte consistent.
 
 ## Safety boundaries
 

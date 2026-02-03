@@ -27,6 +27,8 @@
     "verify:fast": "pnpm run lint && pnpm run typecheck && pnpm run build",
     "verify:full": "pnpm run verify:fast && pnpm run test",
     "docs:verify": "pnpm run build && tsx scripts/docs-verify.ts",
+    "contracts:compat": "tsx scripts/contracts-compat.ts",
+    "fixtures:export": "tsx scripts/fixtures-export.ts",
     "ci": "pnpm run verify:full",
     "runnerless:audit": "autopilot-audit runnerless . || echo 'Install @autopilot/runnerless-audit globally'",
     "prepublishOnly": "pnpm run build"

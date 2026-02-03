@@ -15,6 +15,7 @@ import {
 import {
   JobRequestBundleSchema,
   JobForgeReportEnvelopeSchema,
+  JOBFORGE_SCHEMA_VERSION,
   type JobForgeReportEnvelope,
   type JobRequestBundle,
   type ReportFinding,
@@ -22,7 +23,7 @@ import {
 import type { JobOptions, JobRequest } from './requests.js';
 import { hashCanonical, serializeCanonical, withCanonicalization } from './deterministic.js';
 
-const DEFAULT_SCHEMA_VERSION = '1.0.0';
+const DEFAULT_SCHEMA_VERSION = JOBFORGE_SCHEMA_VERSION;
 const MODULE_ID = 'finops';
 const STABLE_TIMESTAMP = '1970-01-01T00:00:00.000Z';
 const DEFAULT_PERIOD_START = '2024-01-01T00:00:00.000Z';
