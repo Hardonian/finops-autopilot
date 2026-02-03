@@ -46,7 +46,7 @@ describe('Health and capabilities', () => {
 
     it('defines all job types with correct properties', () => {
       const meta = getCapabilityMetadata();
-      expect(meta.job_types).toHaveLength(3);
+      expect(meta.job_types).toHaveLength(4);
 
       const reconcile = meta.job_types.find(j => j.job_type === 'autopilot.finops.reconcile');
       expect(reconcile).toBeDefined();
@@ -54,6 +54,12 @@ describe('Health and capabilities', () => {
       expect(reconcile?.retryable).toBe(true);
       expect(reconcile?.max_retries).toBe(3);
       expect(reconcile?.required_context).toContain('tenant_id');
+
+      const costSnapshot = meta.job_types.find(j => j.job_type === 'autopilot.finops.cost_snapshot');
+      expect(costSnapshot).toBeDefined();
+      expect(costSnapshot?.deterministic).toBe(true);
+      expect(costSnapshot?.cacheable).toBe(true);
+      expect(costSnapshot?.cache_invalidation_rule).toBeDefined();
     });
 
     it('includes input and output formats', () => {
@@ -86,6 +92,7 @@ describe('Health and capabilities', () => {
       expect(isSupportedJobType('autopilot.finops.reconcile')).toBe(true);
       expect(isSupportedJobType('autopilot.finops.anomaly_scan')).toBe(true);
       expect(isSupportedJobType('autopilot.finops.churn_risk_report')).toBe(true);
+      expect(isSupportedJobType('autopilot.finops.cost_snapshot')).toBe(true);
     });
 
     it('returns false for unsupported job types', () => {
