@@ -54,6 +54,7 @@ pnpm run fixtures:export
 Fixtures are written to `fixtures/jobforge/request-bundle.json`, `fixtures/jobforge/report.json`, and `fixtures/jobforge/report.md`.
 
 See [`docs/jobforge-integration.md`](./docs/jobforge-integration.md) for the full integration contract and validation steps.
+See [`docs/runner-maturity.md`](./docs/runner-maturity.md) for execution guarantees, metrics, and failure modes per runner.
 
 ## CLI Commands
 
@@ -138,6 +139,7 @@ pnpm run test:coverage     # Run with coverage
 pnpm run test:watch        # Watch mode
 pnpm run verify:fast       # Lint + typecheck + build
 pnpm run verify:full       # verify:fast + test
+pnpm run cost-risk:audit   # CI cost risk guardrails
 pnpm run docs:verify       # CLI + docs verification
 ```
 

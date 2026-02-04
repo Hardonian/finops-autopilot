@@ -31,6 +31,8 @@ export {
   CostLineItemSchema,
   CostBreakdownSchema,
   CostForecastSchema,
+  RunnerMetricSchema,
+  RunnerMetricsReportSchema,
 } from './contracts/index.js';
 
 export type {
@@ -58,6 +60,8 @@ export type {
   CostLineItem,
   CostBreakdown,
   CostForecast,
+  RunnerMetric,
+  RunnerMetricsReport,
 } from './contracts/index.js';
 
 // Ingest
@@ -150,6 +154,17 @@ export {
 export type {
   CostSnapshotOptions,
 } from './cost-snapshot/index.js';
+
+// Metrics
+export {
+  buildRunnerMetricsReport,
+  validateRunnerMetric,
+  serializeRunnerMetricsReport,
+} from './metrics/index.js';
+
+export type {
+  RunnerMetricsOptions,
+} from './metrics/index.js';
 
 // Health and Capabilities
 export {

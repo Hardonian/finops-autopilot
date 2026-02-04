@@ -23,6 +23,7 @@ import {
 import type { JobOptions } from './requests.js';
 import type { CompatJobRequest, CompatJobRequestWithIdempotency } from '../contracts/compat.js';
 import { hashCanonical, serializeCanonical, withCanonicalization } from './deterministic.js';
+import { buildFinOpsHooks } from './hooks.js';
 
 const DEFAULT_SCHEMA_VERSION = JOBFORGE_SCHEMA_VERSION;
 const MODULE_ID = 'finops';
@@ -161,7 +162,14 @@ function buildAnalyzeJobRequest(params: {
     priority: params.options.priority ?? 'normal',
     max_retries: params.options.maxRetries ?? 3,
     timeout_seconds: params.options.timeoutSeconds ?? 300,
-    metadata: params.options.metadata ?? {},
+    metadata: {
+      finops_hooks: buildFinOpsHooks({
+        tenantId: params.tenantId,
+        projectId: params.projectId,
+        capability: params.jobType,
+      }),
+      ...(params.options.metadata ?? {}),
+    },
   };
 }
 

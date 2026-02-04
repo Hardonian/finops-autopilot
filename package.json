@@ -29,7 +29,8 @@
     "docs:verify": "pnpm run build && tsx scripts/docs-verify.ts",
     "contracts:compat": "tsx scripts/contracts-compat.ts",
     "fixtures:export": "tsx scripts/fixtures-export.ts",
-    "ci": "pnpm run verify:full",
+    "cost-risk:audit": "tsx scripts/cost-risk-audit.ts",
+    "ci": "pnpm run verify:full && pnpm run cost-risk:audit",
     "runnerless:audit": "autopilot-audit runnerless . || echo 'Install @autopilot/runnerless-audit globally'",
     "prepublishOnly": "pnpm run build"
   },

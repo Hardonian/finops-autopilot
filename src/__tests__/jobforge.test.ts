@@ -23,6 +23,7 @@ describe('JobForge', () => {
       expect(job.tenant_id).toBe('test-tenant');
       expect(job.project_id).toBe('test-project');
       expect(job.payload.operation).toBe('reconcile');
+      expect(job.payload.finops_hooks).toBeDefined();
     });
 
     it('should create an anomaly scan job', () => {
@@ -34,6 +35,7 @@ describe('JobForge', () => {
 
       expect(job.job_type).toBe('autopilot.finops.anomaly_scan');
       expect(job.priority).toBe('high');
+      expect(job.payload.finops_hooks).toBeDefined();
     });
 
     it('should create a churn risk job with optional inputs', () => {
@@ -44,10 +46,11 @@ describe('JobForge', () => {
         supportTicketsPath: './tickets.json',
       });
 
-expect(job.job_type).toBe('autopilot.finops.churn_risk_report');
+      expect(job.job_type).toBe('autopilot.finops.churn_risk_report');
       const inputs = job.payload.inputs as Record<string, unknown>;
       expect(inputs.usage_metrics).toBeDefined();
       expect(inputs.support_tickets).toBeDefined();
+      expect(job.payload.finops_hooks).toBeDefined();
     });
   });
 
