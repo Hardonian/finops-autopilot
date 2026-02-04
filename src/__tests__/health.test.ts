@@ -48,12 +48,14 @@ describe('Health and capabilities', () => {
       const meta = getCapabilityMetadata();
       expect(meta.job_types).toHaveLength(4);
 
-      const reconcile = meta.job_types.find(j => j.job_type === 'autopilot.finops.reconcile');
-      expect(reconcile).toBeDefined();
-      expect(reconcile?.idempotent).toBe(true);
-      expect(reconcile?.retryable).toBe(true);
-      expect(reconcile?.max_retries).toBe(3);
-      expect(reconcile?.required_context).toContain('tenant_id');
+      for (const jobType of meta.job_types) {
+        expect(jobType.idempotent).toBe(true);
+        expect(jobType.retryable).toBe(true);
+        expect(jobType.max_retries).toBeGreaterThan(0);
+        expect(jobType.timeout_seconds).toBeGreaterThan(0);
+        expect(jobType.required_context).toContain('tenant_id');
+        expect(jobType.required_context).toContain('project_id');
+      }
 
       const costSnapshot = meta.job_types.find(j => j.job_type === 'autopilot.finops.cost_snapshot');
       expect(costSnapshot).toBeDefined();
