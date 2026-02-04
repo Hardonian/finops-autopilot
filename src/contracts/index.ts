@@ -492,3 +492,35 @@ export type CostLineItem = z.infer<typeof CostLineItemSchema>;
 export type CostBreakdown = z.infer<typeof CostBreakdownSchema>;
 export type CostForecast = z.infer<typeof CostForecastSchema>;
 export type CostSnapshotReport = z.infer<typeof CostSnapshotReportSchema>;
+
+// ============================================================================
+// Runner Metrics (standard export format)
+// ============================================================================
+
+export const RunnerMetricSchema = z.object({
+  runner_id: z.string(),
+  job_type: z.string(),
+  window_start: TimestampSchema,
+  window_end: TimestampSchema,
+  captured_at: TimestampSchema,
+  success_count: z.number().int().min(0),
+  failure_count: z.number().int().min(0),
+  retry_count: z.number().int().min(0),
+  idempotent_replay_count: z.number().int().min(0),
+  input_records: z.number().int().min(0),
+  output_records: z.number().int().min(0),
+  latency_ms_p50: z.number().int().min(0),
+  latency_ms_p95: z.number().int().min(0),
+  cost_risk_flags: z.array(z.string()).default([]),
+  metadata: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const RunnerMetricsReportSchema = z.object({
+  module_id: z.string(),
+  schema_version: z.string(),
+  generated_at: TimestampSchema,
+  metrics: z.array(RunnerMetricSchema),
+});
+
+export type RunnerMetric = z.infer<typeof RunnerMetricSchema>;
+export type RunnerMetricsReport = z.infer<typeof RunnerMetricsReportSchema>;

@@ -14,6 +14,7 @@ import {
   createFinOpsReconcileRequest,
   createFinOpsAnomalyScanRequest,
 } from '@autopilot/jobforge-client';
+import { buildFinOpsHooks } from './hooks.js';
 
 export interface JobOptions {
   tenantId: string;
@@ -61,6 +62,11 @@ export function createReconcileJob(
     payload: {
       ...job.payload,
       operation: 'reconcile',
+      finops_hooks: buildFinOpsHooks({
+        tenantId: options.tenantId,
+        projectId: options.projectId,
+        capability: 'mrr_reconcile',
+      }),
       events_source: {
         type: 'file',
         path: eventsPath,
@@ -103,6 +109,11 @@ export function createAnomalyScanJob(
     payload: {
       ...job.payload,
       operation: 'anomaly_scan',
+      finops_hooks: buildFinOpsHooks({
+        tenantId: options.tenantId,
+        projectId: options.projectId,
+        capability: 'anomaly_detect',
+      }),
       ledger_source: {
         type: 'file',
         path: ledgerPath,
@@ -163,6 +174,11 @@ export function createChurnRiskJob(
     'autopilot.finops.churn_risk_report',
     {
       operation: 'churn_risk_report',
+      finops_hooks: buildFinOpsHooks({
+        tenantId: options.tenantId,
+        projectId: options.projectId,
+        capability: 'churn_assess',
+      }),
       inputs,
       weights: {
         payment_failure: 0.3,
