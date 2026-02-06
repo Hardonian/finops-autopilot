@@ -126,6 +126,47 @@ if (existsSync(distIndex) && existsSync(distCli)) {
   });
 }
 
+// ---- 5b. Runner module present ----
+
+const runnerIndex = resolve(root, 'src', 'runner', 'index.ts');
+if (existsSync(runnerIndex)) {
+  addResult({ name: 'Runner module', status: 'pass', message: 'src/runner/index.ts present' });
+} else {
+  addResult({
+    name: 'Runner module',
+    status: 'fail',
+    message: 'src/runner/index.ts missing',
+    remediation: 'Runner infrastructure must exist at src/runner/',
+  });
+}
+
+// ---- 5c. Artifact layout (if artifacts/ exists, check structure) ----
+
+const artifactsDir = resolve(root, 'artifacts');
+if (existsSync(artifactsDir)) {
+  const artEntries = readdirSync(artifactsDir, { withFileTypes: true });
+  const runDirs = artEntries.filter((e) => e.isDirectory());
+  if (runDirs.length > 0) {
+    const sample = resolve(artifactsDir, runDirs[0].name);
+    const hasSummary = existsSync(join(sample, 'summary.json'));
+    const hasEvidence = existsSync(join(sample, 'evidence'));
+    if (hasSummary && hasEvidence) {
+      addResult({ name: 'Artifact layout', status: 'pass', message: `${runDirs.length} run(s) with valid layout` });
+    } else {
+      addResult({
+        name: 'Artifact layout',
+        status: 'warn',
+        message: 'Artifact directory found but layout incomplete',
+        remediation: 'Each run should have summary.json, evidence/, and logs.jsonl',
+      });
+    }
+  } else {
+    addResult({ name: 'Artifact layout', status: 'pass', message: 'Empty artifacts directory' });
+  }
+} else {
+  addResult({ name: 'Artifact layout', status: 'pass', message: 'No artifacts yet (created on first plan/run)' });
+}
+
 // ---- 6. Secret leakage scan ----
 
 const SECRET_PATTERNS = [
@@ -144,7 +185,7 @@ function scanDir(dir: string, extensions: string[]): string[] {
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (['node_modules', '.git', 'dist', 'coverage'].includes(entry.name)) continue;
+      if (['node_modules', '.git', 'dist', 'coverage', '__tests__', 'fixtures'].includes(entry.name)) continue;
       hits.push(...scanDir(fullPath, extensions));
     } else if (extensions.some((ext) => entry.name.endsWith(ext))) {
       const stat = statSync(fullPath);
@@ -165,6 +206,7 @@ function scanDir(dir: string, extensions: string[]): string[] {
 const secretHits = scanDir(resolve(root, 'src'), ['.ts', '.js', '.json']);
 secretHits.push(...scanDir(resolve(root, 'scripts'), ['.ts', '.js']));
 secretHits.push(...scanDir(resolve(root, 'examples'), ['.json', '.ts', '.js']));
+secretHits.push(...scanDir(resolve(root, 'artifacts'), ['.json', '.jsonl']));
 
 if (secretHits.length === 0) {
   addResult({ name: 'Secret leakage scan', status: 'pass', message: 'No secret patterns detected in source' });

@@ -24,6 +24,10 @@ jobs:
       - run: pnpm run contracts:check
       - run: pnpm run contracts:compat
       - run: pnpm run doctor
+      - name: Smoke test (plan)
+        run: pnpm run plan --config fixtures/smoke-config.json --out /tmp/smoke-plan --json
+      - name: Smoke test (run --smoke)
+        run: pnpm run run -- --smoke --config fixtures/smoke-config.json --out /tmp/smoke-run --json
 
   verify-full:
     if: github.event_name == 'push'
@@ -42,6 +46,10 @@ jobs:
       - run: pnpm run contracts:check
       - run: pnpm run contracts:compat
       - run: pnpm run doctor
+      - name: Smoke test (plan)
+        run: pnpm run plan --config fixtures/smoke-config.json --out /tmp/smoke-plan --json
+      - name: Smoke test (run --smoke)
+        run: pnpm run run -- --smoke --config fixtures/smoke-config.json --out /tmp/smoke-run --json
 
   docs-verify:
     if: github.event_name == 'push'

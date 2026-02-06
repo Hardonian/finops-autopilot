@@ -24,6 +24,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "plan": "tsx src/cli.ts plan",
+    "run": "tsx src/cli.ts run",
     "verify:fast": "pnpm run lint && pnpm run typecheck && pnpm run build",
     "verify:full": "pnpm run verify:fast && pnpm run test",
     "docs:verify": "pnpm run build && tsx scripts/docs-verify.ts",
@@ -32,7 +34,7 @@
     "doctor": "tsx scripts/doctor.ts",
     "fixtures:export": "tsx scripts/fixtures-export.ts",
     "cost-risk:audit": "tsx scripts/cost-risk-audit.ts",
-    "ci": "pnpm run verify:full && pnpm run contracts:check && pnpm run doctor && pnpm run cost-risk:audit",
+    "ci": "pnpm run verify:full && pnpm run contracts:check && pnpm run contracts:compat && pnpm run doctor && pnpm run cost-risk:audit",
     "runnerless:audit": "autopilot-audit runnerless . || echo 'Install @autopilot/runnerless-audit globally'",
     "prepublishOnly": "pnpm run build"
   },
