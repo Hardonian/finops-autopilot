@@ -337,7 +337,7 @@ check('cli-entrypoint', () => {
   }
 });
 
-const cliCommands = ['--help', 'ingest --help', 'reconcile --help', 'anomalies --help', 'churn --help', 'analyze --help', 'health --help'];
+const cliCommands = ['--help', 'plan --help', 'run --help', 'ingest --help', 'reconcile --help', 'anomalies --help', 'churn --help', 'analyze --help', 'health --help'];
 
 for (const cmd of cliCommands) {
   check(`cli:${cmd}`, () => {
