@@ -1,8 +1,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
 import { analyze, renderReport, AnalyzeInputsSchema } from '../src/jobforge/index.js';
 import { serializeCanonical } from '../src/jobforge/deterministic.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const root = resolve(__dirname, '..');
 const fixturesRoot = resolve(root, 'fixtures', 'jobforge');
 const inputPath = resolve(fixturesRoot, 'input.json');

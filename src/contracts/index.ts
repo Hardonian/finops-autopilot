@@ -524,3 +524,121 @@ export const RunnerMetricsReportSchema = z.object({
 
 export type RunnerMetric = z.infer<typeof RunnerMetricSchema>;
 export type RunnerMetricsReport = z.infer<typeof RunnerMetricsReportSchema>;
+
+// ============================================================================
+// Module Manifest (contract kit: describes module capabilities)
+// ============================================================================
+
+export const ModuleManifestSchema = z.object({
+  module_id: z.string().min(1),
+  version: z.string().min(1),
+  schema_version: z.string().min(1),
+  description: z.string().min(1),
+  entrypoints: z.array(z.object({
+    name: z.string().min(1),
+    type: z.enum(['cli', 'api', 'worker']),
+    path: z.string().min(1),
+  })),
+  schemas: z.array(z.string().min(1)),
+  capabilities: z.array(z.string().min(1)),
+  dependencies: z.array(z.object({
+    name: z.string().min(1),
+    version: z.string().min(1),
+    type: z.enum(['runtime', 'peer', 'optional']),
+  })).default([]),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export type ModuleManifest = z.infer<typeof ModuleManifestSchema>;
+
+// ============================================================================
+// Evidence Packet (contract kit: structured audit evidence)
+// ============================================================================
+
+export const EvidencePacketSchema = z.object({
+  packet_id: z.string().min(1),
+  tenant_id: TenantIdSchema,
+  project_id: ProjectIdSchema,
+  created_at: TimestampSchema,
+  source_module: z.string().min(1),
+  event_type: z.string().min(1),
+  severity: z.enum(['info', 'low', 'medium', 'high', 'critical']),
+  summary: z.string().min(1),
+  evidence: z.array(z.object({
+    label: z.string().min(1),
+    value: z.unknown(),
+    source: z.string().min(1).optional(),
+  })),
+  related_entities: z.array(z.object({
+    entity_type: z.string().min(1),
+    entity_id: z.string().min(1),
+  })).default([]),
+  hash: z.string().min(1),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export type EvidencePacket = z.infer<typeof EvidencePacketSchema>;
+
+// ============================================================================
+// Structured Log Event (contract kit: typed log entries)
+// ============================================================================
+
+export const LogLevelSchema = z.enum(['debug', 'info', 'warn', 'error', 'fatal']);
+
+export const StructuredLogEventSchema = z.object({
+  timestamp: TimestampSchema,
+  level: LogLevelSchema,
+  module: z.string().min(1),
+  action: z.string().min(1),
+  tenant_id: TenantIdSchema.optional(),
+  project_id: ProjectIdSchema.optional(),
+  trace_id: z.string().optional(),
+  message: z.string(),
+  data: z.record(z.unknown()).default({}),
+  duration_ms: z.number().int().min(0).optional(),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    stack: z.string().optional(),
+  }).optional(),
+});
+
+export type LogLevel = z.infer<typeof LogLevelSchema>;
+export type StructuredLogEvent = z.infer<typeof StructuredLogEventSchema>;
+
+// ============================================================================
+// Typed Error Envelope (contract kit: structured error responses)
+// ============================================================================
+
+export const ErrorCodeSchema = z.enum([
+  'VALIDATION_ERROR',
+  'SCHEMA_ERROR',
+  'TENANT_MISMATCH',
+  'SECURITY_ERROR',
+  'IO_ERROR',
+  'TIMEOUT',
+  'NOT_FOUND',
+  'CONFLICT',
+  'INTERNAL_ERROR',
+  'UPSTREAM_ERROR',
+]);
+
+export const ErrorEnvelopeSchema = z.object({
+  error: z.object({
+    code: ErrorCodeSchema,
+    message: z.string().min(1),
+    details: z.array(z.object({
+      field: z.string().optional(),
+      constraint: z.string().optional(),
+      message: z.string().min(1),
+    })).default([]),
+    source_module: z.string().min(1),
+    timestamp: TimestampSchema,
+    trace_id: z.string().optional(),
+    retryable: z.boolean(),
+  }),
+  metadata: z.record(z.unknown()).default({}),
+});
+
+export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
+export type ErrorEnvelope = z.infer<typeof ErrorEnvelopeSchema>;

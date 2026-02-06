@@ -1,0 +1,37 @@
+{
+  "name": "finops-autopilot-contracts",
+  "version": "1.0.0",
+  "schemas": [
+    "BillingEventSchema",
+    "NormalizedEventSchema",
+    "LedgerStateSchema",
+    "ReconReportSchema",
+    "AnomalySchema",
+    "ChurnRiskSchema",
+    "JobRequestSchema",
+    "ProfileSchema",
+    "ChurnInputsSchema",
+    "CostSnapshotInputSchema",
+    "CostSnapshotReportSchema",
+    "RunnerMetricSchema",
+    "RunnerMetricsReportSchema",
+    "ModuleManifestSchema",
+    "EvidencePacketSchema",
+    "StructuredLogEventSchema",
+    "ErrorEnvelopeSchema"
+  ],
+  "suiteSchemas": [
+    "TenantContextSchema",
+    "EventEnvelopeSchema",
+    "RunManifestSchema",
+    "ReportEnvelopeSchema",
+    "RedactionPatternSchema",
+    "RedactionHintsSchema"
+  ],
+  "compatSchemas": [
+    "JobRequestBundleSchema",
+    "JobForgeReportEnvelopeSchema",
+    "ReportFindingSchema"
+  ],
+  "updatedAt": "2026-02-06T00:00:00Z"
+}

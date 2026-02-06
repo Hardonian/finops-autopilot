@@ -33,6 +33,12 @@ export {
   CostForecastSchema,
   RunnerMetricSchema,
   RunnerMetricsReportSchema,
+  ModuleManifestSchema,
+  EvidencePacketSchema,
+  StructuredLogEventSchema,
+  LogLevelSchema,
+  ErrorEnvelopeSchema,
+  ErrorCodeSchema,
 } from './contracts/index.js';
 
 export type {
@@ -62,6 +68,12 @@ export type {
   CostForecast,
   RunnerMetric,
   RunnerMetricsReport,
+  ModuleManifest,
+  EvidencePacket,
+  StructuredLogEvent,
+  LogLevel,
+  ErrorEnvelope,
+  ErrorCode,
 } from './contracts/index.js';
 
 // Ingest

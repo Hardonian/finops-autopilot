@@ -2,7 +2,7 @@
   "canonicalization": {
     "algorithm": "sha256",
     "canonical_format": "json-stable",
-    "canonical_hash": "84aa9d6e8c8ee875d9443f18554014702879da3dd422b3b2b5afa603315733bc"
+    "canonical_hash": "25407ae81fa10ba216d067a0a2c9d00d25ccbe680e62ca48b11553fd0356e323"
   },
   "metadata": {
     "job_count": 3
@@ -16,6 +16,19 @@
       "job_type": "autopilot.finops.anomaly_scan",
       "max_retries": 3,
       "metadata": {
+        "finops_hooks": {
+          "capability": "autopilot.finops.anomaly_scan",
+          "cost_context": {
+            "cost_center": "demo-tenant:demo-project",
+            "tags": [
+              "finops",
+              "autopilot.finops.anomaly_scan"
+            ]
+          },
+          "module_id": "finops",
+          "project_id": "demo-project",
+          "tenant_id": "demo-tenant"
+        },
         "job_type_status": "AVAILABLE",
         "jobforge_dry_run": true,
         "module_id": "finops",
@@ -45,6 +58,19 @@
       "job_type": "autopilot.finops.churn_risk_report",
       "max_retries": 3,
       "metadata": {
+        "finops_hooks": {
+          "capability": "autopilot.finops.churn_risk_report",
+          "cost_context": {
+            "cost_center": "demo-tenant:demo-project",
+            "tags": [
+              "finops",
+              "autopilot.finops.churn_risk_report"
+            ]
+          },
+          "module_id": "finops",
+          "project_id": "demo-project",
+          "tenant_id": "demo-tenant"
+        },
         "job_type_status": "AVAILABLE",
         "jobforge_dry_run": true,
         "module_id": "finops",
@@ -81,6 +107,19 @@
       "job_type": "autopilot.finops.reconcile",
       "max_retries": 3,
       "metadata": {
+        "finops_hooks": {
+          "capability": "autopilot.finops.reconcile",
+          "cost_context": {
+            "cost_center": "demo-tenant:demo-project",
+            "tags": [
+              "finops",
+              "autopilot.finops.reconcile"
+            ]
+          },
+          "module_id": "finops",
+          "project_id": "demo-project",
+          "tenant_id": "demo-tenant"
+        },
         "job_type_status": "AVAILABLE",
         "jobforge_dry_run": true,
         "module_id": "finops",

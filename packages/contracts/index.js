@@ -1,9 +1,13 @@
 import { createHash } from 'crypto';
 import { z } from 'zod';
 
+export const TenantIdSchema = z.string().min(1).regex(/^[a-z0-9-]+$/);
+export const ProjectIdSchema = z.string().min(1).regex(/^[a-z0-9-_]+$/);
+export const TimestampSchema = z.string().datetime();
+
 export const TenantContextSchema = z.object({
-  tenant_id: z.string().min(1),
-  project_id: z.string().min(1),
+  tenant_id: TenantIdSchema,
+  project_id: ProjectIdSchema,
 });
 
 export function validateTenantContext(tenantId, projectId) {
