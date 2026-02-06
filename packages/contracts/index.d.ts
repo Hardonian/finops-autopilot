@@ -1,5 +1,12 @@
 import { z } from 'zod';
 
+export const TenantIdSchema: z.ZodString;
+export type TenantId = z.infer<typeof TenantIdSchema>;
+export const ProjectIdSchema: z.ZodString;
+export type ProjectId = z.infer<typeof ProjectIdSchema>;
+export const TimestampSchema: z.ZodString;
+export type Timestamp = z.infer<typeof TimestampSchema>;
+
 export const TenantContextSchema: z.ZodObject<{
   tenant_id: z.ZodString;
   project_id: z.ZodString;

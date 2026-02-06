@@ -131,6 +131,43 @@ Pre-configured profiles available:
 - `aias` - Optimized for AI/ML platform
 - `keys` - Optimized for authentication service
 
+## Contract Kit
+
+Contracts live in `src/contracts/` (Zod schemas) and `packages/contracts/` (shared workspace package). The contract kit includes:
+
+- **Config schema** — `ProfileSchema` (anomaly/churn thresholds, alert routing)
+- **Module manifest schema** — `ModuleManifestSchema` (module capabilities, entrypoints)
+- **Evidence packet schema** — `EvidencePacketSchema` (structured audit evidence)
+- **Structured log event schema** — `StructuredLogEventSchema` (typed log entries)
+- **Typed error envelope schema** — `ErrorEnvelopeSchema` (structured error responses)
+- **Version file** — `contracts.version.json` (schema inventory and drift detection)
+
+### How to run contracts check + doctor
+
+```bash
+# Validate all schemas, SDK exports, and CLI entrypoints
+pnpm run contracts:check
+
+# Verify environment, build prerequisites, and security invariants
+pnpm run doctor
+```
+
+`contracts:check` validates:
+1. All Zod schemas parse with representative data
+2. SDK public API surface matches `contracts.version.json`
+3. CLI binary exists and every subcommand responds to `--help`
+4. `contracts.version.json` is well-formed and all listed schemas exist in source
+
+`doctor` checks:
+1. Node.js >= 20 and pnpm >= 9
+2. Workspace packages installed
+3. TypeScript compiler available
+4. Build output present
+5. No secret leakage patterns in source
+6. Required config files present
+
+Both commands are enforced in CI on every pull request and push to main.
+
 ## Testing
 
 ```bash
@@ -139,6 +176,8 @@ pnpm run test:coverage     # Run with coverage
 pnpm run test:watch        # Watch mode
 pnpm run verify:fast       # Lint + typecheck + build
 pnpm run verify:full       # verify:fast + test
+pnpm run contracts:check   # Validate schemas + exports + CLI
+pnpm run doctor            # Environment + security checks
 pnpm run cost-risk:audit   # CI cost risk guardrails
 pnpm run docs:verify       # CLI + docs verification
 ```
@@ -155,8 +194,8 @@ See `examples/` directory for sample data and usage patterns:
 ## CI/CD
 
 GitHub Actions workflow included:
-- `verify:fast` on pull requests
-- `verify:full` and `docs:verify` on main
+- `verify:fast`, `contracts:check`, `contracts:compat`, `doctor` on pull requests
+- `verify:full`, `contracts:check`, `contracts:compat`, `doctor`, `docs:verify` on main
 
 ## Contributing
 
