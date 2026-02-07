@@ -8,10 +8,10 @@
 import { z } from 'zod';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { MODULE_ID, MODULE_VERSION, getHealthStatus } from '../health/index.js';
-import type { EvidencePacket } from '../contracts/index.js';
-import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope } from '../runner/index.js';
-import { analyze, AnalyzeInputsSchema } from '../jobforge/index.js';
+import { MODULE_ID, MODULE_VERSION, getHealthStatus } from './health/index.js';
+import type { EvidencePacket } from './contracts/index.js';
+import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope } from './runner/index.js';
+import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 
 // ============================================================================
 // Runner Contract Schema
@@ -20,7 +20,7 @@ import { analyze, AnalyzeInputsSchema } from '../jobforge/index.js';
 export const RunnerExecuteResultSchema = z.object({
   status: z.enum(['success', 'error', 'partial']),
   output: z.record(z.unknown()).optional(),
-  evidence: z.array(EvidencePacket).optional(),
+  evidence: z.array(z.unknown()).optional(),
   error: z.object({
     code: z.string(),
     message: z.string(),
@@ -85,7 +85,7 @@ class FinOpsRunner implements RunnerContract {
       });
 
       // Validate inputs against expected schema
-      const validatedInputs = this.validateInputs(inputs, log);
+      const validatedInputs = this.validateInputs(inputs, log) as any;
 
       // Execute the analysis pipeline
       const { jobRequestBundle, reportEnvelope } = analyze(validatedInputs, {
@@ -93,10 +93,10 @@ class FinOpsRunner implements RunnerContract {
       });
 
       // Emit evidence packet
-      const evidencePacket = this.createEvidencePacket(runId, validatedInputs, jobRequestBundle, reportEnvelope);
+      const evidencePacket = this.createEvidencePacket(runId, validatedInputs as any, jobRequestBundle as any, reportEnvelope as any);
 
       // Write outputs
-      const outputs = this.writeOutputs(aw, jobRequestBundle, reportEnvelope, evidencePacket);
+      const outputs = this.writeOutputs(aw as any, jobRequestBundle as any, reportEnvelope as any, evidencePacket as any);
 
       // Finalize artifacts
       aw.finalize({
