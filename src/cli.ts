@@ -322,7 +322,7 @@ ${evidence.summary}
 - **Timestamp**: ${evidence.created_at}
 
 ## Results
-${evidence.evidence.map(e => `- **${e.label}**: ${JSON.stringify(e.value)}`).join('\n')}
+${evidence.evidence.map((e: any) => `- **${e.label}**: ${JSON.stringify(e.value)}`).join('\n')}
 
 ## Runner Contract
 - **ID**: ${demoRunner.id}

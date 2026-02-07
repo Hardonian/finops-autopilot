@@ -99,7 +99,7 @@ class FinOpsRunner implements RunnerContract {
       const outputs = this.writeOutputs(aw, jobRequestBundle, reportEnvelope, evidencePacket);
 
       // Finalize artifacts
-      const summary = aw.finalize({
+      aw.finalize({
         command: 'runner.execute',
         startedAt,
         exitCode: 0,
@@ -160,7 +160,7 @@ class FinOpsRunner implements RunnerContract {
     return parsed.data;
   }
 
-  private createEvidencePacket(runId: string, inputs: any, jobRequestBundle: any, reportEnvelope: any): EvidencePacket {
+  private createEvidencePacket(runId: string, inputs: Record<string, unknown>, jobRequestBundle: unknown, reportEnvelope: unknown) {
     const evidence: EvidencePacket = {
       packet_id: `evidence_${runId}`,
       tenant_id: inputs.tenant_id,
@@ -183,12 +183,12 @@ class FinOpsRunner implements RunnerContract {
         },
         {
           label: 'job_requests_count',
-          value: jobRequestBundle.requests.length,
+          value: (jobRequestBundle as any).requests.length,
           source: 'analysis_output',
         },
         {
           label: 'findings_count',
-          value: reportEnvelope.findings.length,
+          value: (reportEnvelope as any).findings.length,
           source: 'analysis_output',
         },
         {
@@ -218,7 +218,7 @@ class FinOpsRunner implements RunnerContract {
     return evidence;
   }
 
-  private createErrorEvidencePacket(runId: string, inputs: any, errorEnvelope: any, startedAt: string): EvidencePacket {
+  private createErrorEvidencePacket(runId: string, inputs: Record<string, unknown>, errorEnvelope: unknown, startedAt: string): EvidencePacket {
     return {
       packet_id: `error_evidence_${runId}`,
       tenant_id: inputs.tenant_id || 'unknown',
@@ -259,7 +259,7 @@ class FinOpsRunner implements RunnerContract {
     };
   }
 
-  private writeOutputs(aw: any, jobRequestBundle: any, reportEnvelope: any, evidencePacket: EvidencePacket) {
+  private writeOutputs(aw: unknown, jobRequestBundle: unknown, reportEnvelope: unknown, evidencePacket: EvidencePacket) {
     // Write evidence packet as JSON
     aw.writeEvidence('evidence_packet', evidencePacket);
 
