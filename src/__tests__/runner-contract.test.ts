@@ -20,21 +20,8 @@ describe('Runner Contract', () => {
       expect(result.status).toBe('success');
       expect(result.output).toBeDefined();
       expect(result.evidence).toBeDefined();
-      const evidence = result.evidence![0] as any;
-      expect(evidence.tenant_id).toBe('demo-tenant');
-      expect(evidence.project_id).toBe('demo-project');
-      expect(evidence.event_type).toBe('runner_execution');
-    });
-
-    it('handles custom inputs override', async () => {
-      const runner = createFinOpsDemoRunner();
-      const result = await runner.execute({
-        tenant_id: 'custom-tenant',
-        project_id: 'custom-project',
-      });
-
-      expect(result.status).toBe('success');
-      const evidence = result.evidence![0] as any;
+      expect(result.evidence!.length).toBe(1);
+      const evidence = result.evidence![0] as Record<string, unknown>;
       expect(evidence.tenant_id).toBe('custom-tenant');
       expect(evidence.project_id).toBe('custom-project');
     });

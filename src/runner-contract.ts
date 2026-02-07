@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { MODULE_ID, MODULE_VERSION, getHealthStatus } from './health/index.js';
-import type { EvidencePacket, JobForgeReportEnvelope, JobRequestBundle } from './contracts/index.js';
+import type { EvidencePacket, JobForgeReportEnvelope, JobRequestBundle, LedgerState, BillingEvent } from './contracts/index.js';
 import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope, type ArtifactWriter } from './runner/index.js';
 import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 
@@ -326,7 +326,7 @@ class FinOpsDemoRunner extends FinOpsRunner {
     return super.execute(demoInputs);
   }
 
-  private getDemoLedger() {
+  private getDemoLedger(): LedgerState {
     return {
       tenant_id: 'demo-tenant',
       project_id: 'demo-project',
@@ -368,7 +368,7 @@ class FinOpsDemoRunner extends FinOpsRunner {
     };
   }
 
-  private getDemoEvents() {
+  private getDemoEvents(): BillingEvent[] {
     return [
       {
         tenant_id: 'demo-tenant',
