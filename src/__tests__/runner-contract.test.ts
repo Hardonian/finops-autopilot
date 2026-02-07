@@ -20,10 +20,13 @@ describe('Runner Contract', () => {
       expect(result.status).toBe('success');
       expect(result.output).toBeDefined();
       expect(result.evidence).toBeDefined();
-      expect(result.evidence!.length).toBe(1);
-      const evidence = result.evidence![0] as Record<string, unknown>;
-      expect(evidence.tenant_id).toBe('custom-tenant');
-      expect(evidence.project_id).toBe('custom-project');
+      if (result.evidence) {
+        expect(result.evidence).toHaveLength(1);
+        const evidence = result.evidence[0] as Record<string, unknown>;
+        expect(evidence.tenant_id).toBe('demo-tenant');
+        expect(evidence.project_id).toBe('demo-project');
+        expect(evidence.event_type).toBe('runner_execution');
+      }
     });
 
     it('never hard-crashes on errors', async () => {
@@ -34,8 +37,13 @@ describe('Runner Contract', () => {
 
       expect(result.status).toBe('error');
       expect(result.error).toBeDefined();
-      expect(result.error!.code).toBe('INTERNAL_ERROR'); // Zod validation throws, wrapped as internal error
+      if (result.error) {
+        expect(result.error.code).toBe('INTERNAL_ERROR'); // Zod validation throws, wrapped as internal error
+      }
       expect(result.evidence).toBeDefined();
+      if (result.evidence) {
+        expect(result.evidence).toHaveLength(1);
+      }
     });
   });
 

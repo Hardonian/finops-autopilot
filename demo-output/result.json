@@ -2,10 +2,10 @@
   "status": "success",
   "output": {
     "evidence_packet": {
-      "packet_id": "evidence_run_1770431181755_opibwz900",
+      "packet_id": "evidence_run_1770431649693_wdpmn32e7",
       "tenant_id": "demo-tenant",
       "project_id": "demo-project",
-      "created_at": "2026-02-07T02:26:21.770Z",
+      "created_at": "2026-02-07T02:34:09.708Z",
       "source_module": "finops",
       "event_type": "runner_execution",
       "severity": "info",
@@ -33,7 +33,7 @@
         },
         {
           "label": "run_id",
-          "value": "run_1770431181755_opibwz900",
+          "value": "run_1770431649693_wdpmn32e7",
           "source": "runner_metadata"
         }
       ],
@@ -54,7 +54,7 @@
         "execution_mode": "runner"
       }
     },
-    "evidence_summary": "# FinOps Runner Execution Evidence\n\n## Summary\nFinOps runner executed 0 job requests with 0 findings\n\n## Execution Details\n- **Run ID**: run_1770431181755_opibwz900\n- **Tenant**: demo-tenant\n- **Project**: demo-project\n- **Timestamp**: 2026-02-07T02:26:21.770Z\n- **Module**: finops@0.1.0\n\n## Results\n- **Job Requests**: 0\n- **Findings**: 0\n\n## Evidence\n- **input_tenant**: \"demo-tenant\"\n- **input_project**: \"demo-project\"\n- **job_requests_count**: 0\n- **findings_count**: 0\n- **run_id**: \"run_1770431181755_opibwz900\"\n\n## Metadata\n- **module_version**: 0.1.0\n- **schema_version**: 1.0.0\n- **execution_mode**: runner\n",
+    "evidence_summary": "# FinOps Runner Execution Evidence\n\n## Summary\nFinOps runner executed 0 job requests with 0 findings\n\n## Execution Details\n- **Run ID**: run_1770431649693_wdpmn32e7\n- **Tenant**: demo-tenant\n- **Project**: demo-project\n- **Timestamp**: 2026-02-07T02:34:09.708Z\n- **Module**: finops@0.1.0\n\n## Results\n- **Job Requests**: 0\n- **Findings**: 0\n\n## Evidence\n- **input_tenant**: \"demo-tenant\"\n- **input_project**: \"demo-project\"\n- **job_requests_count**: 0\n- **findings_count**: 0\n- **run_id**: \"run_1770431649693_wdpmn32e7\"\n\n## Metadata\n- **module_version**: 0.1.0\n- **schema_version**: 1.0.0\n- **execution_mode**: runner\n",
     "job_request_bundle": {
       "schema_version": "1.0.0",
       "module_id": "finops",
@@ -104,14 +104,14 @@
         "canonical_hash": "f8d04dd90dfa37e8085dae8dadcfbe45a539cd8958f7e5c07fa4e812d2a0c775"
       }
     },
-    "artifact_dir": "C:\\Users\\scott\\Documents\\GitHub\\finops-autopilot\\.finops-runner\\run_1770431181755_opibwz900\\artifacts\\20260206-212621-fcebe4ab"
+    "artifact_dir": "C:\\Users\\scott\\Documents\\GitHub\\finops-autopilot\\.finops-runner\\run_1770431649693_wdpmn32e7\\artifacts\\20260206-213409-234f9935"
   },
   "evidence": [
     {
-      "packet_id": "evidence_run_1770431181755_opibwz900",
+      "packet_id": "evidence_run_1770431649693_wdpmn32e7",
       "tenant_id": "demo-tenant",
       "project_id": "demo-project",
-      "created_at": "2026-02-07T02:26:21.770Z",
+      "created_at": "2026-02-07T02:34:09.708Z",
       "source_module": "finops",
       "event_type": "runner_execution",
       "severity": "info",
@@ -139,7 +139,7 @@
         },
         {
           "label": "run_id",
-          "value": "run_1770431181755_opibwz900",
+          "value": "run_1770431649693_wdpmn32e7",
           "source": "runner_metadata"
         }
       ],

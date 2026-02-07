@@ -310,7 +310,7 @@ program
               writeFileSync(resolve(outputDir, 'evidence.json'), JSON.stringify(result.evidence[0], null, 2), 'utf-8');
 
               // Generate and write markdown summary
-              const evidence = result.evidence[0] as any;
+              const evidence = result.evidence[0] as Record<string, unknown>;
               const markdownSummary = `# FinOps Demo Evidence
 
 ## Summary
@@ -322,7 +322,10 @@ ${evidence.summary}
 - **Timestamp**: ${evidence.created_at}
 
 ## Results
-${evidence.evidence.map((e: any) => `- **${e.label}**: ${JSON.stringify(e.value)}`).join('\n')}
+${(evidence.evidence as unknown[]).map((e: unknown) => {
+  const entry = e as Record<string, unknown>;
+  return `- **${entry.label}**: ${JSON.stringify(entry.value)}`;
+}).join('\n')}
 
 ## Runner Contract
 - **ID**: ${demoRunner.id}

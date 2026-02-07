@@ -10,7 +10,8 @@ import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { MODULE_ID, MODULE_VERSION, getHealthStatus } from './health/index.js';
 import type { EvidencePacket, JobForgeReportEnvelope, JobRequestBundle, LedgerState, BillingEvent } from './contracts/index.js';
-import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope, type ArtifactWriter } from './runner/index.js';
+import type { AnalyzeInputs } from './jobforge/index.js';
+import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope, type ArtifactWriter, type StructuredLogger } from './runner/index.js';
 import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 
 // ============================================================================
@@ -85,7 +86,7 @@ class FinOpsRunner implements RunnerContract {
       });
 
       // Validate inputs against expected schema
-      const validatedInputs = this.validateInputs(inputs, log) as any;
+      const validatedInputs = this.validateInputs(inputs, log) as AnalyzeInputs;
 
       // Execute the analysis pipeline
       const { jobRequestBundle, reportEnvelope } = analyze(validatedInputs, {
@@ -93,10 +94,10 @@ class FinOpsRunner implements RunnerContract {
       });
 
       // Emit evidence packet
-      const evidencePacket = this.createEvidencePacket(runId, validatedInputs as any, jobRequestBundle as any, reportEnvelope as any);
+      const evidencePacket = this.createEvidencePacket(runId, validatedInputs, jobRequestBundle, reportEnvelope);
 
       // Write outputs
-      const outputs = this.writeOutputs(aw as any, jobRequestBundle as any, reportEnvelope as any, evidencePacket as any);
+      const outputs = this.writeOutputs(aw, jobRequestBundle, reportEnvelope, evidencePacket);
 
       // Finalize artifacts
       aw.finalize({
@@ -142,7 +143,7 @@ class FinOpsRunner implements RunnerContract {
     }
   }
 
-  private validateInputs(inputs: Record<string, unknown>, log: any): Record<string, unknown> {
+  private validateInputs(inputs: Record<string, unknown>, log: StructuredLogger): AnalyzeInputs {
     // Merge with default values for runner context
     const mergedInputs = {
       ...inputs,
@@ -219,7 +220,7 @@ class FinOpsRunner implements RunnerContract {
   }
 
   private createErrorEvidencePacket(runId: string, inputs: Record<string, unknown>, errorEnvelope: unknown, startedAt: string): EvidencePacket {
-    const errEnv = errorEnvelope as any;
+    const errEnv = errorEnvelope as Record<string, unknown>;
     return {
       packet_id: `error_evidence_${runId}`,
       tenant_id: (inputs.tenant_id as string) || 'unknown',
@@ -260,7 +261,7 @@ class FinOpsRunner implements RunnerContract {
     };
   }
 
-  private writeOutputs(aw: ArtifactWriter, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope, evidencePacket: EvidencePacket) {
+  private writeOutputs(aw: ArtifactWriter, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope, evidencePacket: EvidencePacket): Record<string, unknown> {
     // Write evidence packet as JSON
     aw.writeEvidence('evidence_packet', evidencePacket);
 
@@ -277,7 +278,7 @@ class FinOpsRunner implements RunnerContract {
     };
   }
 
-  private generateMarkdownSummary(evidence: EvidencePacket, jobRequestBundle: any, reportEnvelope: any): string {
+  private generateMarkdownSummary(evidence: EvidencePacket, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope): string {
     return `# FinOps Runner Execution Evidence
 
 ## Summary
