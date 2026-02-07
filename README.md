@@ -60,11 +60,79 @@ See [`docs/runner-maturity.md`](./docs/runner-maturity.md) for execution guarant
 
 | Command | Description |
 | --- | --- |
+| `finops plan` | Dry-run: produce plan and artifacts without side effects |
+| `finops run` | Execute runner (use --smoke for quick validation) |
+| `finops demo` | Run deterministic demo with sample data (no external secrets) |
 | `finops ingest` | Normalize billing event exports |
 | `finops reconcile` | Build ledger + reconcile MRR |
 | `finops anomalies` | Detect anomalies from ledger data |
 | `finops churn` | Assess churn risk signals |
 | `finops analyze` | Emit JobForge bundle + report (dry-run) |
+| `finops health` | Display module health status and capabilities |
+
+## Runner Contract (ControlPlane Integration)
+
+This module implements a standardized runner contract that ControlPlane can invoke directly:
+
+```typescript
+import { createFinOpsRunner } from 'finops-autopilot';
+
+const runner = createFinOpsRunner();
+const result = await runner.execute({
+  tenant_id: 'my-tenant',
+  project_id: 'my-project',
+  // ... other inputs
+});
+
+// Result is always safe - never hard-crashes
+if (result.status === 'success') {
+  // Process successful output
+  console.log('Runner executed successfully', result.output);
+} else {
+  // Handle error gracefully
+  console.error('Runner failed:', result.error);
+}
+
+// Evidence packet always emitted for audit trails
+console.log('Evidence:', result.evidence);
+```
+
+### Runner Contract Properties
+
+- **id**: `'finops'`
+- **version**: `'0.1.0'`
+- **capabilities**: Array of supported capabilities
+- **blastRadius**: `'medium'` (impact scope for safety)
+- **execute()**: Main execution method that returns `{status, output, evidence, error?}`
+
+### Safe Execution Guarantees
+
+The `execute()` method never hard-crashes and always returns a structured result:
+- **Success**: `{status: 'success', output: {...}, evidence: [...]}`
+- **Error**: `{status: 'error', error: {code, message}, evidence: [...]}`
+- **Partial**: `{status: 'partial', ...}` (for graceful degradation)
+
+### Evidence Packets
+
+Every execution emits structured evidence packets containing:
+- Execution inputs, decisions, and outputs
+- Timestamps and version information
+- JSON format + short markdown summary
+- Deterministic hashing for audit trails
+
+### Demo Runner
+
+For testing and development, use the deterministic demo runner:
+
+```bash
+# CLI demo
+finops demo --out ./demo-output
+
+# Programmatic demo
+import { createFinOpsDemoRunner } from 'finops-autopilot';
+const demoRunner = createFinOpsDemoRunner();
+const result = await demoRunner.execute({});
+```
 
 ## Architecture
 

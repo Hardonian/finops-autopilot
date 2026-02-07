@@ -195,3 +195,16 @@ export type {
   JobTypeCapability,
   DLQSemantics,
 } from './health/index.js';
+
+// Runner Contract
+export {
+  createFinOpsRunner,
+  createFinOpsDemoRunner,
+  RunnerContractSchema,
+  RunnerExecuteResultSchema,
+} from './runner-contract.js';
+
+export type {
+  RunnerContract,
+  RunnerExecuteResult,
+} from './runner-contract.js';

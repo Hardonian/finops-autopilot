@@ -27,10 +27,9 @@ import {
   safeJsonParse,
   validateTenantContext,
 } from './security/index.js';
-import { getHealthStatus, getCapabilityMetadata } from './health/index.js';
+import { getHealthStatus } from './health/index.js';
 import type { ChurnInputs, NormalizedEvent } from './contracts/index.js';
-import { analyze, renderReport, AnalyzeInputsSchema } from './jobforge/index.js';
-import { serializeCanonical } from './jobforge/deterministic.js';
+import { createFinOpsDemoRunner } from './runner-contract.js';
 
 import {
   createArtifactWriter,
@@ -271,306 +270,86 @@ program
           if (!options.json) console.log(`\n  Written to: ${resolve(outputPath)}`);
         }
       }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
+     } catch (err) {
+       handleCliError(err, options.json);
+     }
+   });
 
-program
-  .command('reconcile')
-  .description('Reconcile MRR from normalized events')
-  .addHelpText('after', '\nExample:\n  finops reconcile --normalized ./normalized.json --tenant my-tenant --project my-project\n')
-  .requiredOption('--normalized <path>', 'Path to normalized events JSON file')
-  .option('--tenant <id>', 'Tenant ID', 'default')
-  .option('--project <id>', 'Project ID', 'default')
-  .option('--period-start <date>', 'Period start (ISO 8601)', getFirstDayOfMonth())
-  .option('--period-end <date>', 'Period end (ISO 8601)', getLastDayOfMonth())
-  .option('--output <path>', 'Output file path')
-  .option('--out <path>', 'Output file path (alias)')
-  .option('--json', 'Emit structured JSON to stdout')
-  .option('--dry-run', 'Dry-run: validate but do not write output', false)
-  .action((options) => {
-    try {
-      const normalizedPath = resolve(options.normalized);
-      if (!existsSync(normalizedPath)) {
-        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', `Normalized events file not found: ${normalizedPath}`), options.json);
-      }
+ // ----------------------------------------------------------------------------
+ // demo — run deterministic demo with sample data
+ // ----------------------------------------------------------------------------
 
-      const events: NormalizedEvent[] = JSON.parse(readFileSync(normalizedPath, 'utf-8'));
+ program
+   .command('demo')
+   .description('Run deterministic demo with sample data (no external secrets)')
+   .option('--out <dir>', 'Output directory', './demo-output')
+   .option('--json', 'Emit structured JSON to stdout')
+   .action(async (options) => {
+     try {
+       const outputDir = resolve(options.out);
+       mkdirSync(outputDir, { recursive: true });
 
-      if (!Array.isArray(events)) {
-        exitWithEnvelope(createErrorEnvelope('VALIDATION_ERROR', 'Normalized events file must contain an array'), options.json);
-      }
+       console.log('Running FinOps demo...');
 
-      const ledger = buildLedger(events, {
-        tenantId: options.tenant,
-        projectId: options.project,
-        periodStart: options.periodStart,
-        periodEnd: options.periodEnd,
-      });
+       const demoRunner = createFinOpsDemoRunner();
+       const result = await demoRunner.execute({});
 
-      const report = reconcileMrr(ledger, {
-        tenantId: options.tenant,
-        projectId: options.project,
-        periodStart: options.periodStart,
-        periodEnd: options.periodEnd,
-      });
+       if (options.json) {
+         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+       } else {
+         if (result.status === 'success') {
+           console.log(`\nDemo completed successfully!`);
+           console.log(`Status: ${result.status}`);
+           console.log(`Output directory: ${outputDir}`);
 
-      if (options.json) {
-        process.stdout.write(JSON.stringify({ ledger, report }, null, 2) + '\n');
-      } else {
-        console.log(`\nLedger Summary:`);
-        console.log(`  Total MRR: $${(ledger.total_mrr_cents / 100).toFixed(2)}`);
-        console.log(`  Customers: ${ledger.total_customers}`);
-        console.log(`  Active subscriptions: ${ledger.active_subscriptions}`);
-        console.log(`  Events processed: ${ledger.event_count}`);
-        console.log(`\nReconciliation Report:`);
-        console.log(`  Report ID: ${report.report_id}`);
-        console.log(`  Expected MRR: $${(report.total_expected_mrr_cents / 100).toFixed(2)}`);
-        console.log(`  Observed MRR: $${(report.total_observed_mrr_cents / 100).toFixed(2)}`);
-        console.log(`  Difference: $${(report.total_difference_cents / 100).toFixed(2)}`);
-        console.log(`  Balanced: ${report.is_balanced ? 'Yes' : 'No'}`);
-        console.log(`  Report hash: ${report.report_hash.slice(0, 16)}...`);
+           // Write outputs to files
+           if (result.output) {
+             writeFileSync(resolve(outputDir, 'result.json'), JSON.stringify(result, null, 2), 'utf-8');
 
-        if (report.discrepancies.length > 0) {
-          console.log(`\n  Discrepancies (${report.discrepancies.length}):`);
-          report.discrepancies.slice(0, 5).forEach((d) => {
-            console.log(`    - ${d.subscription_id}: $${(d.difference_cents / 100).toFixed(2)} (${d.reason})`);
-          });
-        }
+             if (result.evidence && result.evidence[0]) {
+               writeFileSync(resolve(outputDir, 'evidence.json'), JSON.stringify(result.evidence[0], null, 2), 'utf-8');
 
-        if (report.missing_events.length > 0) {
-          console.log(`\n  Missing events detected: ${report.missing_events.length}`);
-        }
-      }
+               // Generate and write markdown summary
+               const evidence = result.evidence[0];
+               const markdownSummary = `# FinOps Demo Evidence
 
-      if (!options.dryRun) {
-        const outputPath = options.output ?? options.out;
-        if (outputPath) {
-          writeFileSync(resolve(outputPath), JSON.stringify({ ledger, report }, null, 2), 'utf-8');
-          if (!options.json) console.log(`\n  Written to: ${resolve(outputPath)}`);
-        }
-      }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
+## Summary
+${evidence.summary}
 
-program
-  .command('anomalies')
-  .description('Detect anomalies in ledger data')
-  .addHelpText('after', '\nExample:\n  finops anomalies --ledger ./ledger.json --tenant my-tenant --project my-project\n')
-  .requiredOption('--ledger <path>', 'Path to ledger JSON file')
-  .option('--tenant <id>', 'Tenant ID', 'default')
-  .option('--project <id>', 'Project ID', 'default')
-  .option('--profile <name>', 'Profile to use for thresholds', 'base')
-  .option('--reference-date <date>', 'Reference date (ISO 8601)', new Date().toISOString())
-  .option('--output <path>', 'Output file path')
-  .option('--out <path>', 'Output file path (alias)')
-  .option('--json', 'Emit structured JSON to stdout')
-  .option('--dry-run', 'Dry-run: validate but do not write output', false)
-  .action((options) => {
-    try {
-      const ledgerPath = resolve(options.ledger);
-      if (!existsSync(ledgerPath)) {
-        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', `Ledger file not found: ${ledgerPath}`), options.json);
-      }
+## Execution Details
+- **Tenant**: ${evidence.tenant_id}
+- **Project**: ${evidence.project_id}
+- **Timestamp**: ${evidence.created_at}
 
-      const ledger = JSON.parse(readFileSync(ledgerPath, 'utf-8'));
-      const events: NormalizedEvent[] = [];
-      const profile = getProfile(options.profile);
+## Results
+${evidence.evidence.map(e => `- **${e.label}**: ${JSON.stringify(e.value)}`).join('\n')}
 
-      const result = detectAnomalies(events, ledger, {
-        tenantId: options.tenant,
-        projectId: options.project,
-        referenceDate: options.referenceDate,
-        profile,
-      });
+## Runner Contract
+- **ID**: ${demoRunner.id}
+- **Version**: ${demoRunner.version}
+- **Capabilities**: ${demoRunner.capabilities.join(', ')}
+- **Blast Radius**: ${demoRunner.blastRadius}
+`;
 
-      if (options.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-      } else {
-        console.log(`\nAnomaly Detection Results:`);
-        console.log(`  Profile: ${profile.name}`);
-        console.log(`  Total anomalies: ${result.stats.total}`);
-        console.log(`  By severity:`, result.stats.bySeverity);
-        console.log(`  By type:`, result.stats.byType);
+               writeFileSync(resolve(outputDir, 'evidence.md'), markdownSummary, 'utf-8');
+               console.log(`Evidence written to: ${resolve(outputDir, 'evidence.md')}`);
+             }
 
-        if (result.anomalies.length > 0) {
-          console.log(`\n  Anomalies (top 10):`);
-          result.anomalies
-            .sort((a, b) => (b.severity === 'critical' ? 1 : 0) - (a.severity === 'critical' ? 1 : 0))
-            .slice(0, 10)
-            .forEach((a) => {
-              console.log(`    [${a.severity.toUpperCase()}] ${a.anomaly_type}: ${a.description.slice(0, 60)}...`);
-            });
-        }
-      }
+             console.log(`Full results written to: ${resolve(outputDir, 'result.json')}`);
+           }
+         } else {
+           console.log(`\nDemo failed with status: ${result.status}`);
+           if (result.error) {
+             console.log(`Error: ${result.error.message}`);
+           }
+         }
+       }
+     } catch (err) {
+       handleCliError(err, options.json);
+     }
+   });
 
-      if (!options.dryRun) {
-        const outputPath = options.output ?? options.out;
-        if (outputPath) {
-          writeFileSync(resolve(outputPath), JSON.stringify(result, null, 2), 'utf-8');
-          if (!options.json) console.log(`\n  Written to: ${resolve(outputPath)}`);
-        }
-      }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
-
-program
-  .command('churn')
-  .description('Assess churn risk for customers')
-  .addHelpText('after', '\nExample:\n  finops churn --inputs ./churn-inputs.json --tenant my-tenant --project my-project\n')
-  .requiredOption('--inputs <path>', 'Path to churn inputs JSON file')
-  .option('--tenant <id>', 'Tenant ID', 'default')
-  .option('--project <id>', 'Project ID', 'default')
-  .option('--profile <name>', 'Profile to use for thresholds', 'base')
-  .option('--output <path>', 'Output file path')
-  .option('--out <path>', 'Output file path (alias)')
-  .option('--json', 'Emit structured JSON to stdout')
-  .option('--dry-run', 'Dry-run: validate but do not write output', false)
-  .action((options) => {
-    try {
-      const inputsPath = resolve(options.inputs);
-      if (!existsSync(inputsPath)) {
-        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', `Inputs file not found: ${inputsPath}`), options.json);
-      }
-
-      const inputs: ChurnInputs = JSON.parse(readFileSync(inputsPath, 'utf-8'));
-      const profile = getProfile(options.profile);
-
-      const result = assessChurnRisk(inputs, {
-        tenantId: options.tenant,
-        projectId: options.project,
-        referenceDate: inputs.reference_date,
-        profile,
-      });
-
-      if (options.json) {
-        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-      } else {
-        console.log(`\nChurn Risk Assessment:`);
-        console.log(`  Profile: ${profile.name}`);
-        console.log(`  Customers assessed: ${result.stats.totalAssessed}`);
-        console.log(`  By risk level:`, result.stats.byLevel);
-        console.log(`  Average risk score: ${result.stats.averageScore.toFixed(1)}/100`);
-
-        if (result.risks.length > 0) {
-          console.log(`\n  High/Critical Risk Customers (top 10):`);
-          result.risks
-            .filter((r) => r.risk_level === 'high' || r.risk_level === 'critical')
-            .slice(0, 10)
-            .forEach((r) => {
-              console.log(`    [${r.risk_level.toUpperCase()}] ${r.customer_id}: ${r.risk_score}/100 - ${r.explanation.slice(0, 50)}...`);
-            });
-        }
-      }
-
-      if (!options.dryRun) {
-        const outputPath = options.output ?? options.out;
-        if (outputPath) {
-          writeFileSync(resolve(outputPath), JSON.stringify(result, null, 2), 'utf-8');
-          if (!options.json) console.log(`\n  Written to: ${resolve(outputPath)}`);
-        }
-      }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
-
-program
-  .command('health')
-  .description('Display module health status and capabilities')
-  .option('--json', 'Output as JSON')
-  .action((options) => {
-    try {
-      const health = getHealthStatus();
-      const capabilities = getCapabilityMetadata();
-
-      if (options.json) {
-        process.stdout.write(JSON.stringify({ health, capabilities }, null, 2) + '\n');
-      } else {
-        console.log('\nHealth Status:');
-        console.log(`  Module: ${health.module_id}@${health.module_version}`);
-        console.log(`  Status: ${health.status}`);
-        console.log(`  Timestamp: ${health.timestamp}`);
-        console.log(`  Checks: contracts=${health.checks.contracts}, schemas=${health.checks.schemas}, profiles=${health.checks.profiles}`);
-        console.log('\nCapabilities:');
-        console.log(`  Job Types: ${capabilities.job_types.map((j) => j.job_type).join(', ')}`);
-        console.log(`  Input Formats: ${capabilities.input_formats.join(', ')}`);
-        console.log(`  Output Formats: ${capabilities.output_formats.join(', ')}`);
-        console.log(`  Features: ${capabilities.features.join(', ')}`);
-        console.log(`\nDLQ Semantics:`);
-        console.log(`  Enabled: ${capabilities.dlq_semantics.enabled}`);
-        console.log(`  Max Attempts: ${capabilities.dlq_semantics.max_attempts}`);
-        console.log(`  Backoff: ${capabilities.dlq_semantics.backoff_strategy}`);
-      }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
-
-program
-  .command('analyze')
-  .description('Generate JobForge request bundle and report (dry-run only)')
-  .addHelpText('after', '\nExample:\n  finops analyze --inputs ./fixtures/jobforge/input.json --tenant my-tenant --project my-project --trace trace-1 --out ./out/jobforge --stable-output\n')
-  .requiredOption('--inputs <path>', 'Path to analyze inputs JSON file')
-  .requiredOption('--tenant <id>', 'Tenant ID')
-  .requiredOption('--project <id>', 'Project ID')
-  .requiredOption('--trace <id>', 'Trace ID')
-  .requiredOption('--out <dir>', 'Output directory for JobForge artifacts')
-  .option('--json', 'Emit structured JSON to stdout')
-  .option('--stable-output', 'Produce deterministic output for fixtures/docs', false)
-  .option('--no-markdown', 'Skip writing report.md')
-  .action((options) => {
-    try {
-      const inputsPath = resolve(options.inputs);
-      if (!existsSync(inputsPath)) {
-        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', `Inputs file not found: ${inputsPath}`), options.json);
-      }
-
-      const rawInputs = JSON.parse(readFileSync(inputsPath, 'utf-8')) as Record<string, unknown>;
-      const mergedInputs = {
-        ...rawInputs,
-        tenant_id: options.tenant,
-        project_id: options.project,
-        trace_id: options.trace,
-      };
-
-      const parsed = AnalyzeInputsSchema.safeParse(mergedInputs);
-      if (!parsed.success) {
-        exitWithEnvelope(
-          createErrorEnvelope('VALIDATION_ERROR', parsed.error.errors.map((e) => e.message).join('; ')),
-          options.json,
-        );
-        return; // unreachable, but satisfies TS narrowing
-      }
-
-      const { jobRequestBundle, reportEnvelope } = analyze(parsed.data, {
-        stableOutput: options.stableOutput,
-      });
-
-      const outputDir = resolve(options.out);
-      mkdirSync(outputDir, { recursive: true });
-
-      writeFileSync(resolve(outputDir, 'request-bundle.json'), serializeCanonical(jobRequestBundle), 'utf-8');
-      writeFileSync(resolve(outputDir, 'report.json'), serializeCanonical(reportEnvelope), 'utf-8');
-
-      if (options.markdown) {
-        writeFileSync(resolve(outputDir, 'report.md'), renderReport(reportEnvelope, 'md'), 'utf-8');
-      }
-
-      if (options.json) {
-        process.stdout.write(JSON.stringify({ output_dir: outputDir, files: ['request-bundle.json', 'report.json'] }, null, 2) + '\n');
-      } else {
-        console.log(`JobForge artifacts written to ${outputDir}`);
-      }
-    } catch (err) {
-      handleCliError(err, options.json);
-    }
-  });
+ program.parse();
 
 // ---------------------------------------------------------------------------
 // Config loading
@@ -797,5 +576,3 @@ function getLastDayOfMonth(): string {
   date.setHours(23, 59, 59, 999);
   return date.toISOString();
 }
-
-program.parse();
