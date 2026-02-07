@@ -306,12 +306,12 @@ program
            if (result.output) {
              writeFileSync(resolve(outputDir, 'result.json'), JSON.stringify(result, null, 2), 'utf-8');
 
-             if (result.evidence && result.evidence[0]) {
-               writeFileSync(resolve(outputDir, 'evidence.json'), JSON.stringify(result.evidence[0], null, 2), 'utf-8');
+            if (result.evidence && result.evidence[0]) {
+              writeFileSync(resolve(outputDir, 'evidence.json'), JSON.stringify(result.evidence[0], null, 2), 'utf-8');
 
-               // Generate and write markdown summary
-               const evidence = result.evidence[0];
-               const markdownSummary = `# FinOps Demo Evidence
+              // Generate and write markdown summary
+              const evidence = result.evidence[0] as any;
+              const markdownSummary = `# FinOps Demo Evidence
 
 ## Summary
 ${evidence.summary}
@@ -331,9 +331,9 @@ ${evidence.evidence.map((e: any) => `- **${e.label}**: ${JSON.stringify(e.value)
 - **Blast Radius**: ${demoRunner.blastRadius}
 `;
 
-               writeFileSync(resolve(outputDir, 'evidence.md'), markdownSummary, 'utf-8');
-               console.log(`Evidence written to: ${resolve(outputDir, 'evidence.md')}`);
-             }
+              writeFileSync(resolve(outputDir, 'evidence.md'), markdownSummary, 'utf-8');
+              console.log(`Evidence written to: ${resolve(outputDir, 'evidence.md')}`);
+            }
 
              console.log(`Full results written to: ${resolve(outputDir, 'result.json')}`);
            }

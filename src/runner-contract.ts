@@ -10,7 +10,7 @@ import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { MODULE_ID, MODULE_VERSION, getHealthStatus } from './health/index.js';
 import type { EvidencePacket, JobForgeReportEnvelope, JobRequestBundle } from './contracts/index.js';
-import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope } from './runner/index.js';
+import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope, type ArtifactWriter } from './runner/index.js';
 import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 
 // ============================================================================
@@ -20,7 +20,7 @@ import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 export const RunnerExecuteResultSchema = z.object({
   status: z.enum(['success', 'error', 'partial']),
   output: z.record(z.unknown()).optional(),
-  evidence: z.array(z.unknown()).optional(),
+  evidence: z.array(z.record(z.unknown())).optional(),
   error: z.object({
     code: z.string(),
     message: z.string(),
@@ -163,8 +163,8 @@ class FinOpsRunner implements RunnerContract {
   private createEvidencePacket(runId: string, inputs: Record<string, unknown>, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope): EvidencePacket {
     const evidence: EvidencePacket = {
       packet_id: `evidence_${runId}`,
-      tenant_id: inputs.tenant_id,
-      project_id: inputs.project_id,
+      tenant_id: inputs.tenant_id as string,
+      project_id: inputs.project_id as string,
       created_at: new Date().toISOString(),
       source_module: MODULE_ID,
       event_type: 'runner_execution',
@@ -200,11 +200,11 @@ class FinOpsRunner implements RunnerContract {
       related_entities: [
         {
           entity_type: 'tenant',
-          entity_id: inputs.tenant_id,
+          entity_id: inputs.tenant_id as string,
         },
         {
           entity_type: 'project',
-          entity_id: inputs.project_id,
+          entity_id: inputs.project_id as string,
         },
       ],
       hash: 'placeholder_hash', // Would compute actual hash
@@ -260,7 +260,7 @@ class FinOpsRunner implements RunnerContract {
     };
   }
 
-  private writeOutputs(aw: unknown, jobRequestBundle: unknown, reportEnvelope: unknown, evidencePacket: EvidencePacket) {
+  private writeOutputs(aw: ArtifactWriter, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope, evidencePacket: EvidencePacket) {
     // Write evidence packet as JSON
     aw.writeEvidence('evidence_packet', evidencePacket);
 
