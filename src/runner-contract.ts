@@ -9,7 +9,7 @@ import { z } from 'zod';
 import { mkdirSync } from 'fs';
 import { resolve } from 'path';
 import { MODULE_ID, MODULE_VERSION, getHealthStatus } from './health/index.js';
-import type { EvidencePacket } from './contracts/index.js';
+import type { EvidencePacket, JobForgeReportEnvelope, JobRequestBundle } from './contracts/index.js';
 import { createArtifactWriter, createLogger, wrapError, createErrorEnvelope } from './runner/index.js';
 import { analyze, AnalyzeInputsSchema } from './jobforge/index.js';
 
@@ -142,7 +142,7 @@ class FinOpsRunner implements RunnerContract {
     }
   }
 
-  private validateInputs(inputs: Record<string, unknown>, log: any) {
+  private validateInputs(inputs: Record<string, unknown>, log: any): Record<string, unknown> {
     // Merge with default values for runner context
     const mergedInputs = {
       ...inputs,
@@ -160,7 +160,7 @@ class FinOpsRunner implements RunnerContract {
     return parsed.data;
   }
 
-  private createEvidencePacket(runId: string, inputs: Record<string, unknown>, jobRequestBundle: unknown, reportEnvelope: unknown) {
+  private createEvidencePacket(runId: string, inputs: Record<string, unknown>, jobRequestBundle: JobRequestBundle, reportEnvelope: JobForgeReportEnvelope): EvidencePacket {
     const evidence: EvidencePacket = {
       packet_id: `evidence_${runId}`,
       tenant_id: inputs.tenant_id,
@@ -173,22 +173,22 @@ class FinOpsRunner implements RunnerContract {
       evidence: [
         {
           label: 'input_tenant',
-          value: inputs.tenant_id,
+          value: inputs.tenant_id as string,
           source: 'runner_input',
         },
         {
           label: 'input_project',
-          value: inputs.project_id,
+          value: inputs.project_id as string,
           source: 'runner_input',
         },
         {
           label: 'job_requests_count',
-          value: (jobRequestBundle as any).requests.length,
+          value: jobRequestBundle.requests.length,
           source: 'analysis_output',
         },
         {
           label: 'findings_count',
-          value: (reportEnvelope as any).findings.length,
+          value: reportEnvelope.findings.length,
           source: 'analysis_output',
         },
         {
@@ -219,24 +219,25 @@ class FinOpsRunner implements RunnerContract {
   }
 
   private createErrorEvidencePacket(runId: string, inputs: Record<string, unknown>, errorEnvelope: unknown, startedAt: string): EvidencePacket {
+    const errEnv = errorEnvelope as any;
     return {
       packet_id: `error_evidence_${runId}`,
-      tenant_id: inputs.tenant_id || 'unknown',
-      project_id: inputs.project_id || 'unknown',
+      tenant_id: (inputs.tenant_id as string) || 'unknown',
+      project_id: (inputs.project_id as string) || 'unknown',
       created_at: new Date().toISOString(),
       source_module: MODULE_ID,
       event_type: 'runner_execution_error',
       severity: 'high',
-      summary: `FinOps runner execution failed: ${errorEnvelope.userMessage}`,
+      summary: `FinOps runner execution failed: ${errEnv.userMessage}`,
       evidence: [
         {
           label: 'error_code',
-          value: errorEnvelope.code,
+          value: errEnv.code,
           source: 'error_envelope',
         },
         {
           label: 'error_message',
-          value: errorEnvelope.userMessage,
+          value: errEnv.userMessage,
           source: 'error_envelope',
         },
         {
