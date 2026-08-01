@@ -40,8 +40,8 @@ importers:
         specifier: ^9.17.0
         version: 9.39.2
       globals:
-        specifier: ^17.3.0
-        version: 17.3.0
+        specifier: ^17.8.0
+        version: 17.8.0
       tsx:
         specifier: ^4.19.2
         version: 4.21.0
@@ -924,8 +924,8 @@ packages:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
     engines: {node: '>=18'}
 
-  globals@17.3.0:
-    resolution: {integrity: sha512-yMqGUQVVCkD4tqjOJf3TnrvaaHDMYp4VlUSObbkIiuCPe/ofdMBFIAcBbCSRFWOnos6qRiTVStDwqPLUclaxIw==}
+  globals@17.8.0:
+    resolution: {integrity: sha512-Zz/LMDZScFmkakeL2cTHzf+PbWKdpU3uclqkZT7TjDG58j5WPt0PpA+n9uPI24fZtlw07q0OtEi84K+umsRzqQ==}
     engines: {node: '>=18'}
 
   has-flag@4.0.0:
@@ -2072,7 +2072,7 @@ snapshots:
 
   globals@14.0.0: {}
 
-  globals@17.3.0: {}
+  globals@17.8.0: {}
 
   has-flag@4.0.0: {}
 
