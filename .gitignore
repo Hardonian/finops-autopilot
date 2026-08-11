@@ -38,3 +38,7 @@ artifacts/
 
 # Examples output (generated temp dir from docs:verify)
 examples/output/jobforge-generated/
+__pycache__/
+build/
+.pytest_cache/
+*.pyc
