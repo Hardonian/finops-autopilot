@@ -420,7 +420,7 @@ export function ingestEvents(
       const dedupKey = `${eventId}_${rawAsRecord.customer_id ?? 'unknown'}`;
 
       if (options.dedupWindowSeconds && seenEventKeys.has(dedupKey)) {
-        const lastSeenMs = seenEventKeys.get(dedupKey)!;
+        const lastSeenMs = seenEventKeys.get(dedupKey) ?? 0;
         const diffSeconds = Math.abs(timestampMs - lastSeenMs) / 1000;
         if (diffSeconds <= options.dedupWindowSeconds) {
           duplicateCount++;
