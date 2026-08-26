@@ -22,8 +22,10 @@ import type {
   ChurnInputs,
   Profile,
   ChurnThreshold,
+  RevenueAtRisk,
+  LedgerState,
 } from '../contracts/index.js';
-import { ChurnRiskSchema } from '../contracts/index.js';
+import { ChurnRiskSchema, RevenueAtRiskSchema } from '../contracts/index.js';
 import { createHash } from 'crypto';
 
 export interface ChurnOptions {
@@ -45,11 +47,74 @@ export interface ChurnResult {
     };
     averageScore: number;
   };
+  revenue_at_risk?: RevenueAtRisk;
 }
 
 // Risk ID cache with bounded size to prevent unbounded growth
 const riskIdCache = new Map<string, string>();
 const MAX_CACHE_SIZE = 10000;
+
+/**
+ * Calculate Revenue At Risk metrics across customer cohorts
+ */
+export function calculateRevenueAtRisk(
+  risks: ChurnRisk[],
+  ledger: LedgerState,
+  options: ChurnOptions
+): RevenueAtRisk {
+  let atRiskMrr = 0;
+  let criticalRiskMrr = 0;
+  let highRiskCount = 0;
+
+  const topRiskCustomers: RevenueAtRisk['top_risk_customers'] = [];
+
+  for (const risk of risks) {
+    const customer = ledger.customers[risk.customer_id];
+    const mrr = customer?.total_mrr_cents ?? 0;
+
+    if (risk.risk_level === 'high' || risk.risk_level === 'critical' || risk.risk_level === 'medium') {
+      atRiskMrr += mrr;
+    }
+
+    if (risk.risk_level === 'critical') {
+      criticalRiskMrr += mrr;
+    }
+
+    if (risk.risk_level === 'high' || risk.risk_level === 'critical') {
+      highRiskCount++;
+    }
+
+    if (risk.risk_score >= 50 && mrr > 0) {
+      const topSignal = risk.contributing_signals.sort((a, b) => b.weight - a.weight)[0];
+      topRiskCustomers.push({
+        customer_id: risk.customer_id,
+        mrr_cents: mrr,
+        risk_score: risk.risk_score,
+        risk_level: risk.risk_level,
+        primary_reason: topSignal ? `${topSignal.signal_type} (${topSignal.evidence.join('; ')})` : risk.explanation,
+      });
+    }
+  }
+
+  topRiskCustomers.sort((a, b) => b.mrr_cents - a.mrr_cents);
+
+  const totalMrr = ledger.total_mrr_cents;
+  const atRiskPct = totalMrr > 0 ? (atRiskMrr / totalMrr) * 100 : 0;
+
+  const report: RevenueAtRisk = {
+    tenant_id: options.tenantId,
+    project_id: options.projectId,
+    total_mrr_cents: totalMrr,
+    at_risk_mrr_cents: atRiskMrr,
+    critical_risk_mrr_cents: criticalRiskMrr,
+    high_risk_customers_count: highRiskCount,
+    at_risk_percentage: Math.round(atRiskPct * 100) / 100,
+    top_risk_customers: topRiskCustomers.slice(0, 10),
+    calculated_at: options.referenceDate,
+  };
+
+  return RevenueAtRiskSchema.parse(report);
+}
 
 /**
  * Assess churn risk for all customers in ledger
@@ -134,8 +199,9 @@ export function assessChurnRisk(
 
   // Calculate stats in single pass
   const stats = calculateStatsOptimized(risks);
+  const revenue_at_risk = calculateRevenueAtRisk(risks, inputs.ledger, options);
 
-  return { risks, stats };
+  return { risks, stats, revenue_at_risk };
 }
 
 /**

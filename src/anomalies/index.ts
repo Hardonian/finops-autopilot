@@ -77,6 +77,10 @@ export function detectAnomalies(
   anomalies.push(...detectDisputeSpikesOptimized(detectionContext));
   anomalies.push(...detectPaymentFailureSpikesOptimized(detectionContext));
   anomalies.push(...detectOutOfSequenceEventsOptimized(detectionContext));
+  anomalies.push(...detectUsageDropsOptimized(detectionContext));
+  anomalies.push(...detectMrrDiscrepanciesOptimized(detectionContext));
+  anomalies.push(...detectStatisticalSpikesEwma(detectionContext));
+  anomalies.push(...detectGhostSubscriptions(detectionContext));
 
   // Batch validate anomalies at boundary (not during detection)
   const validatedAnomalies = batchValidateAnomalies(anomalies);
@@ -614,6 +618,189 @@ function detectOutOfSequenceEventsOptimized(ctx: DetectionContext): Anomaly[] {
         };
 
         anomalies.push(anomaly);
+      }
+    }
+  }
+
+  return anomalies;
+}
+
+/**
+ * Detect sudden usage collapse anomalies
+ */
+function detectUsageDropsOptimized(ctx: DetectionContext): Anomaly[] {
+  const { options, thresholds, eventIndices } = ctx;
+  const anomalies: Anomaly[] = [];
+
+  const usageByCustomer = new Map<string, number[]>();
+  for (const event of eventIndices.paymentEvents) {
+    if (event.event_type === 'usage_recorded' && event.amount_cents) {
+      const history = usageByCustomer.get(event.customer_id) ?? [];
+      history.push(event.amount_cents);
+      usageByCustomer.set(event.customer_id, history);
+    }
+  }
+
+  for (const [customerId, history] of usageByCustomer.entries()) {
+    if (history.length >= 2) {
+      const prev = history[history.length - 2];
+      const curr = history[history.length - 1];
+      if (prev > 0) {
+        const dropPct = ((prev - curr) / prev) * 100;
+        if (dropPct >= thresholds.usage_drop_threshold_pct) {
+          anomalies.push({
+            anomaly_id: generateAnomalyId('usage_drop', options.tenantId, options.projectId, customerId),
+            tenant_id: options.tenantId,
+            project_id: options.projectId,
+            anomaly_type: 'usage_drop',
+            severity: dropPct > 80 ? 'critical' : 'high',
+            detected_at: options.referenceDate,
+            customer_id: customerId,
+            description: `Sudden usage collapse detected: dropped ${dropPct.toFixed(1)}% (from $${(prev / 100).toFixed(2)} to $${(curr / 100).toFixed(2)})`,
+            affected_events: [],
+            expected_value: prev,
+            observed_value: curr,
+            difference: prev - curr,
+            confidence: Math.min(dropPct / 100, 0.95),
+            recommended_action: 'Check customer health and operational integration status',
+            metadata: {
+              drop_pct: dropPct,
+            },
+          });
+        }
+      }
+    }
+  }
+
+  return anomalies;
+}
+
+/**
+ * Detect MRR discrepancies (active subscriptions with 0 payments or mismatched billing)
+ */
+function detectMrrDiscrepanciesOptimized(ctx: DetectionContext): Anomaly[] {
+  const { ledger, options } = ctx;
+  const anomalies: Anomaly[] = [];
+
+  for (const customer of Object.values(ledger.customers)) {
+    for (const sub of customer.subscriptions) {
+      if (sub.status === 'active' && sub.mrr_cents > 0 && customer.total_paid_cents === 0) {
+        anomalies.push({
+          anomaly_id: generateAnomalyId('mrr_discrepancy', options.tenantId, options.projectId, sub.subscription_id),
+          tenant_id: options.tenantId,
+          project_id: options.projectId,
+          anomaly_type: 'mrr_discrepancy',
+          severity: sub.mrr_cents > 50000 ? 'high' : 'medium',
+          detected_at: options.referenceDate,
+          customer_id: customer.customer_id,
+          subscription_id: sub.subscription_id,
+          description: `Active subscription with expected MRR of $${(sub.mrr_cents / 100).toFixed(2)} has no observed payments`,
+          affected_events: [],
+          expected_value: sub.mrr_cents,
+          observed_value: 0,
+          difference: sub.mrr_cents,
+          confidence: 0.85,
+          recommended_action: 'Investigate missing invoices or payment gateway integration failures',
+          metadata: {
+            plan_id: sub.plan_id,
+          },
+        });
+      }
+    }
+  }
+
+  return anomalies;
+}
+
+/**
+ * EWMA and statistical outlier detection for transaction amounts
+ */
+function detectStatisticalSpikesEwma(ctx: DetectionContext): Anomaly[] {
+  const { events, options } = ctx;
+  const anomalies: Anomaly[] = [];
+
+  const paymentAmounts: number[] = [];
+  for (const e of events) {
+    if ((e.event_type === 'invoice_paid' || e.event_type === 'payment_succeeded') && e.amount_cents && e.amount_cents > 0) {
+      paymentAmounts.push(e.amount_cents);
+    }
+  }
+
+  if (paymentAmounts.length < 5) return anomalies;
+
+  const mean = paymentAmounts.reduce((a, b) => a + b, 0) / paymentAmounts.length;
+  const variance = paymentAmounts.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / paymentAmounts.length;
+  const stdDev = Math.sqrt(variance);
+
+  if (stdDev === 0) return anomalies;
+
+  for (const e of events) {
+    if ((e.event_type === 'invoice_paid' || e.event_type === 'payment_succeeded') && e.amount_cents) {
+      const zScore = (e.amount_cents - mean) / stdDev;
+      if (zScore >= 3.5) {
+        anomalies.push({
+          anomaly_id: generateAnomalyId('double_charge', options.tenantId, options.projectId, e.event_id),
+          tenant_id: options.tenantId,
+          project_id: options.projectId,
+          anomaly_type: 'double_charge',
+          severity: zScore > 5 ? 'critical' : 'high',
+          detected_at: options.referenceDate,
+          customer_id: e.customer_id,
+          subscription_id: e.subscription_id,
+          description: `Statistical outlier payment detected: $${(e.amount_cents / 100).toFixed(2)} (Z-score ${zScore.toFixed(2)}, mean $${(mean / 100).toFixed(2)})`,
+          affected_events: [e.event_id],
+          expected_value: Math.round(mean),
+          observed_value: e.amount_cents,
+          difference: e.amount_cents - Math.round(mean),
+          confidence: Math.min(0.7 + (zScore - 3.5) * 0.1, 0.99),
+          recommended_action: 'Verify large transaction amount against contract pricing',
+          metadata: {
+            z_score: zScore,
+            mean_cents: Math.round(mean),
+            std_dev_cents: Math.round(stdDev),
+          },
+        });
+      }
+    }
+  }
+
+  return anomalies;
+}
+
+/**
+ * Detect phantom/ghost subscriptions with long inactivity
+ */
+function detectGhostSubscriptions(ctx: DetectionContext): Anomaly[] {
+  const { ledger, options } = ctx;
+  const anomalies: Anomaly[] = [];
+
+  for (const customer of Object.values(ledger.customers)) {
+    for (const sub of customer.subscriptions) {
+      if (sub.status === 'active' && customer.last_invoice_at) {
+        const lastActivityDate = new Date(customer.last_invoice_at).getTime();
+        const refDate = new Date(options.referenceDate).getTime();
+        const daysInactive = (refDate - lastActivityDate) / (1000 * 60 * 60 * 24);
+
+        if (daysInactive > 60) {
+          anomalies.push({
+            anomaly_id: generateAnomalyId('missing_invoice', options.tenantId, options.projectId, sub.subscription_id),
+            tenant_id: options.tenantId,
+            project_id: options.projectId,
+            anomaly_type: 'missing_invoice',
+            severity: 'medium',
+            detected_at: options.referenceDate,
+            customer_id: customer.customer_id,
+            subscription_id: sub.subscription_id,
+            description: `Ghost subscription: ${sub.subscription_id} is active but has had no invoice activity for ${Math.round(daysInactive)} days`,
+            affected_events: [],
+            confidence: 0.8,
+            recommended_action: 'Audit subscription lifecycle state with upstream billing gateway',
+            metadata: {
+              days_inactive: Math.round(daysInactive),
+              last_activity: customer.last_invoice_at,
+            },
+          });
+        }
       }
     }
   }

@@ -208,6 +208,20 @@ export const MrrDiscrepancySchema = z.object({
   events_involved: z.array(EventIdSchema),
 });
 
+export const MrrWaterfallSchema = z.object({
+  starting_mrr_cents: z.number().int(),
+  new_mrr_cents: z.number().int(),
+  expansion_mrr_cents: z.number().int(),
+  contraction_mrr_cents: z.number().int(),
+  churn_mrr_cents: z.number().int(),
+  reactivation_mrr_cents: z.number().int(),
+  net_new_mrr_cents: z.number().int(),
+  ending_mrr_cents: z.number().int(),
+  currency: CurrencySchema.default('USD'),
+  period_start: TimestampSchema,
+  period_end: TimestampSchema,
+});
+
 export const ReconReportSchema = z.object({
   tenant_id: TenantIdSchema,
   project_id: ProjectIdSchema,
@@ -221,11 +235,14 @@ export const ReconReportSchema = z.object({
   discrepancies: z.array(MrrDiscrepancySchema),
   missing_events: z.array(BillingEventSchema),
   unmatched_observations: z.array(z.record(z.unknown())),
+  waterfall: MrrWaterfallSchema.optional(),
+  remediation_playbook: z.array(z.string()).optional(),
   is_balanced: z.boolean(),
   report_hash: z.string(),
   version: z.string().default('1.0.0'),
 });
 
+export type MrrWaterfall = z.infer<typeof MrrWaterfallSchema>;
 export type MrrDiscrepancy = z.infer<typeof MrrDiscrepancySchema>;
 export type ReconReport = z.infer<typeof ReconReportSchema>;
 
@@ -642,3 +659,46 @@ export const ErrorEnvelopeSchema = z.object({
 
 export type ErrorCode = z.infer<typeof ErrorCodeSchema>;
 export type ErrorEnvelope = z.infer<typeof ErrorEnvelopeSchema>;
+
+// ============================================================================
+// Multi-Format Ingestion & Telemetry
+// ============================================================================
+
+export const IngestFormatSchema = z.enum(['json', 'jsonl', 'csv', 'stripe', 'aws_cur', 'gcp_billing']);
+export type IngestFormat = z.infer<typeof IngestFormatSchema>;
+
+export const CsvIngestConfigSchema = z.object({
+  delimiter: z.string().default(','),
+  has_headers: z.boolean().default(true),
+  format: IngestFormatSchema.default('csv'),
+  column_mapping: z.record(z.string()).optional(),
+  date_format: z.string().optional(),
+});
+export type CsvIngestConfig = z.infer<typeof CsvIngestConfigSchema>;
+
+// ============================================================================
+// Churn Valuation & Health Tiering
+// ============================================================================
+
+export const CustomerHealthTierSchema = z.enum(['healthy', 'monitored', 'at_risk', 'critical', 'churned']);
+export type CustomerHealthTier = z.infer<typeof CustomerHealthTierSchema>;
+
+export const RevenueAtRiskSchema = z.object({
+  tenant_id: TenantIdSchema,
+  project_id: ProjectIdSchema,
+  total_mrr_cents: z.number().int().min(0),
+  at_risk_mrr_cents: z.number().int().min(0),
+  critical_risk_mrr_cents: z.number().int().min(0),
+  high_risk_customers_count: z.number().int().min(0),
+  at_risk_percentage: z.number().min(0).max(100),
+  top_risk_customers: z.array(z.object({
+    customer_id: CustomerIdSchema,
+    mrr_cents: z.number().int(),
+    risk_score: z.number(),
+    risk_level: z.enum(['low', 'medium', 'high', 'critical']),
+    primary_reason: z.string(),
+  })),
+  calculated_at: TimestampSchema,
+});
+export type RevenueAtRisk = z.infer<typeof RevenueAtRiskSchema>;
+

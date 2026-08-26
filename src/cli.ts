@@ -17,7 +17,7 @@
 import { Command } from 'commander';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
-import { ingestEvents, serializeEvents } from './ingest/index.js';
+import { ingestEvents, ingestAny, serializeEvents } from './ingest/index.js';
 import { buildLedger, reconcileMrr } from './reconcile/index.js';
 import { detectAnomalies } from './anomalies/index.js';
 import { assessChurnRisk } from './churn/index.js';
@@ -27,9 +27,12 @@ import {
   safeJsonParse,
   validateTenantContext,
 } from './security/index.js';
-import { getHealthStatus } from './health/index.js';
-import type { ChurnInputs, NormalizedEvent } from './contracts/index.js';
+import { getHealthStatus, getCapabilityMetadata } from './health/index.js';
+import type { ChurnInputs, NormalizedEvent, IngestFormat } from './contracts/index.js';
 import { createFinOpsDemoRunner } from './runner-contract.js';
+import { analyze, renderReport, AnalyzeInputsSchema } from './jobforge/index.js';
+import { serializeCanonical } from './jobforge/deterministic.js';
+import { generateCostSnapshot } from './cost-snapshot/index.js';
 
 import {
   createArtifactWriter,
@@ -195,9 +198,10 @@ program
   .command('ingest')
   .description('Ingest and normalize billing events')
   .addHelpText('after', '\nExample:\n  finops ingest --events ./billing-events.json --tenant my-tenant --project my-project\n')
-  .requiredOption('--events <path>', 'Path to billing events JSON file')
+  .requiredOption('--events <path>', 'Path to billing events file (JSON, CSV, JSONL)')
   .option('--tenant <id>', 'Tenant ID', 'default')
   .option('--project <id>', 'Project ID', 'default')
+  .option('--format <format>', 'Input format (json, csv, jsonl, stripe, aws_cur, gcp_billing)')
   .option('--output <path>', 'Output file path')
   .option('--out <path>', 'Output file path (alias for --output)')
   .option('--json', 'Emit structured JSON to stdout')
@@ -221,19 +225,10 @@ program
       }
 
       const fileContent = readFileSync(eventsPath, 'utf-8');
-      const parseResult = safeJsonParse<unknown[]>(fileContent);
-      if (!parseResult.success) {
-        exitWithEnvelope(createErrorEnvelope('VALIDATION_ERROR', parseResult.error ?? 'JSON parse error'), options.json);
-      }
-
-      const rawEvents = parseResult.data;
-      if (!Array.isArray(rawEvents)) {
-        exitWithEnvelope(createErrorEnvelope('VALIDATION_ERROR', 'Events file must contain an array'), options.json);
-      }
-
-      const result = ingestEvents(rawEvents as unknown[], {
+      const result = ingestAny(fileContent, {
         tenantId: options.tenant,
         projectId: options.project,
+        format: options.format as IngestFormat,
         skipValidation: options.skipValidation,
       });
 
@@ -250,6 +245,7 @@ program
         console.log(`  Total events: ${result.stats.total}`);
         console.log(`  Valid: ${result.stats.valid}`);
         console.log(`  Invalid: ${result.stats.invalid}`);
+        console.log(`  Duplicates: ${result.stats.duplicates}`);
         console.log(`  By type:`, result.stats.byType);
 
         if (result.errors.length > 0) {
@@ -270,46 +266,491 @@ program
           if (!options.json) console.log(`\n  Written to: ${resolve(outputPath)}`);
         }
       }
-     } catch (err) {
-       handleCliError(err, options.json);
-     }
-   });
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
 
- // ----------------------------------------------------------------------------
- // demo — run deterministic demo with sample data
- // ----------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// reconcile — build ledger + reconcile MRR
+// ---------------------------------------------------------------------------
 
- program
-   .command('demo')
-   .description('Run deterministic demo with sample data (no external secrets)')
-   .option('--out <dir>', 'Output directory', './demo-output')
-   .option('--json', 'Emit structured JSON to stdout')
-   .action(async (options) => {
-     try {
-       const outputDir = resolve(options.out);
-       mkdirSync(outputDir, { recursive: true });
+program
+  .command('reconcile')
+  .description('Build customer ledger and reconcile MRR')
+  .addHelpText('after', '\nExample:\n  finops reconcile --normalized ./normalized.json --tenant my-tenant --project my-project\n')
+  .requiredOption('--normalized <path>', 'Path to normalized events JSON file')
+  .option('--tenant <id>', 'Tenant ID', 'default')
+  .option('--project <id>', 'Project ID', 'default')
+  .option('--period-start <iso>', 'Reconciliation period start (ISO timestamp)')
+  .option('--period-end <iso>', 'Reconciliation period end (ISO timestamp)')
+  .option('--output <path>', 'Output file path for ledger/report')
+  .option('--out <path>', 'Output file path (alias for --output)')
+  .option('--json', 'Emit structured JSON to stdout')
+  .option('--dry-run', 'Dry-run: validate but do not write output', false)
+  .action((options) => {
+    try {
+      const tenantValidation = validateTenantContext(options.tenant, options.project);
+      if (!tenantValidation.valid) {
+        exitWithEnvelope(createErrorEnvelope('SECURITY_ERROR', tenantValidation.error ?? 'Invalid tenant context'), options.json);
+      }
 
-       console.log('Running FinOps demo...');
+      const pathValidation = validateSafePath(options.normalized);
+      if (!pathValidation.valid) {
+        exitWithEnvelope(createErrorEnvelope('SECURITY_ERROR', pathValidation.error ?? 'Invalid path'), options.json);
+      }
 
-       const demoRunner = createFinOpsDemoRunner();
-       const result = await demoRunner.execute({});
+      const normalizedPath = resolve(options.normalized);
+      if (!existsSync(normalizedPath)) {
+        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', 'Normalized events file not found'), options.json);
+      }
 
-       if (options.json) {
-         process.stdout.write(JSON.stringify(result, null, 2) + '\n');
-       } else {
-         if (result.status === 'success') {
-           console.log(`\nDemo completed successfully!`);
-           console.log(`Status: ${result.status}`);
-           console.log(`Output directory: ${outputDir}`);
+      const raw = JSON.parse(readFileSync(normalizedPath, 'utf-8'));
+      const events: NormalizedEvent[] = Array.isArray(raw) ? raw : [];
 
-           // Write outputs to files
-           if (result.output) {
-             writeFileSync(resolve(outputDir, 'result.json'), JSON.stringify(result, null, 2), 'utf-8');
+      const periodStart = options.periodStart ?? (events[0]?.timestamp ?? getFirstDayOfMonth());
+      const periodEnd = options.periodEnd ?? (events[events.length - 1]?.timestamp ?? getLastDayOfMonth());
+
+      const ledger = buildLedger(events, {
+        tenantId: options.tenant,
+        projectId: options.project,
+        periodStart,
+        periodEnd,
+      });
+
+      const report = reconcileMrr(ledger, {
+        tenantId: options.tenant,
+        projectId: options.project,
+        periodStart,
+        periodEnd,
+      }, events);
+
+      const result = {
+        ledger_summary: {
+          total_mrr_cents: ledger.total_mrr_cents,
+          total_customers: ledger.total_customers,
+          active_subscriptions: ledger.active_subscriptions,
+          event_count: ledger.event_count,
+        },
+        reconciliation: {
+          is_balanced: report.is_balanced,
+          total_expected_mrr_cents: report.total_expected_mrr_cents,
+          total_observed_mrr_cents: report.total_observed_mrr_cents,
+          total_difference_cents: report.total_difference_cents,
+          discrepancy_count: report.discrepancies.length,
+          waterfall: report.waterfall,
+          remediation_playbook: report.remediation_playbook,
+        },
+        report,
+      };
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        console.log(`\nReconciliation Results for ${options.tenant}/${options.project}:`);
+        console.log(`  Total MRR: $${(ledger.total_mrr_cents / 100).toFixed(2)}`);
+        console.log(`  Customers: ${ledger.total_customers} (Active Subscriptions: ${ledger.active_subscriptions})`);
+        console.log(`  Balanced: ${report.is_balanced ? 'YES' : 'NO'}`);
+        console.log(`  Discrepancies: ${report.discrepancies.length}`);
+
+        if (report.waterfall) {
+          console.log(`\n  MRR Waterfall:`);
+          console.log(`    Starting MRR:    $${(report.waterfall.starting_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    + New MRR:       $${(report.waterfall.new_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    + Expansion:     $${(report.waterfall.expansion_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    + Reactivation:  $${(report.waterfall.reactivation_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    - Contraction:   $${(report.waterfall.contraction_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    - Churn:         $${(report.waterfall.churn_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    = Ending MRR:    $${(report.waterfall.ending_mrr_cents / 100).toFixed(2)}`);
+        }
+
+        if (report.remediation_playbook && report.remediation_playbook.length > 0) {
+          console.log(`\n  Remediation Playbook:`);
+          for (const item of report.remediation_playbook.slice(0, 5)) {
+            console.log(`    • ${item}`);
+          }
+        }
+      }
+
+      if (!options.dryRun) {
+        const outPath = options.output ?? options.out;
+        if (outPath) {
+          writeFileSync(resolve(outPath), JSON.stringify(result, null, 2), 'utf-8');
+          if (!options.json) console.log(`\n  Written to: ${resolve(outPath)}`);
+        }
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// anomalies — detect anomalies in billing data
+// ---------------------------------------------------------------------------
+
+program
+  .command('anomalies')
+  .description('Detect billing anomalies and operational irregularities')
+  .addHelpText('after', '\nExample:\n  finops anomalies --ledger ./ledger.json --tenant my-tenant --project my-project\n')
+  .requiredOption('--ledger <path>', 'Path to ledger state JSON file')
+  .option('--events <path>', 'Path to normalized billing events JSON file')
+  .option('--tenant <id>', 'Tenant ID', 'default')
+  .option('--project <id>', 'Project ID', 'default')
+  .option('--profile <name>', 'Configuration profile (base, jobforge, settler, readylayer, aias, keys)', 'base')
+  .option('--output <path>', 'Output file path')
+  .option('--out <path>', 'Output file path (alias for --output)')
+  .option('--json', 'Emit structured JSON to stdout')
+  .action((options) => {
+    try {
+      const tenantValidation = validateTenantContext(options.tenant, options.project);
+      if (!tenantValidation.valid) {
+        exitWithEnvelope(createErrorEnvelope('SECURITY_ERROR', tenantValidation.error ?? 'Invalid tenant context'), options.json);
+      }
+
+      const ledgerPath = resolve(options.ledger);
+      if (!existsSync(ledgerPath)) {
+        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', 'Ledger file not found'), options.json);
+      }
+
+      const ledger = JSON.parse(readFileSync(ledgerPath, 'utf-8'));
+      let events: NormalizedEvent[] = [];
+      if (options.events && existsSync(resolve(options.events))) {
+        events = JSON.parse(readFileSync(resolve(options.events), 'utf-8'));
+      }
+
+      const profile = getProfile(options.profile);
+      const result = detectAnomalies(events, ledger, {
+        tenantId: options.tenant,
+        projectId: options.project,
+        referenceDate: new Date().toISOString(),
+        profile,
+      });
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        console.log(`\nAnomaly Detection Results (${options.profile} profile):`);
+        console.log(`  Total anomalies detected: ${result.stats.total}`);
+        console.log(`  By severity:`, result.stats.bySeverity);
+        console.log(`  By type:`, result.stats.byType);
+
+        if (result.anomalies.length > 0) {
+          console.log(`\n  Top Anomalies:`);
+          for (const a of result.anomalies.slice(0, 5)) {
+            console.log(`    [${a.severity.toUpperCase()}] ${a.anomaly_type}: ${a.description}`);
+            if (a.recommended_action) {
+              console.log(`      → Action: ${a.recommended_action}`);
+            }
+          }
+        }
+      }
+
+      const outPath = options.output ?? options.out;
+      if (outPath) {
+        writeFileSync(resolve(outPath), JSON.stringify(result, null, 2), 'utf-8');
+        if (!options.json) console.log(`\n  Written to: ${resolve(outPath)}`);
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// churn — assess customer churn risk
+// ---------------------------------------------------------------------------
+
+program
+  .command('churn')
+  .description('Assess customer churn risk and compute revenue-at-risk')
+  .addHelpText('after', '\nExample:\n  finops churn --inputs ./churn-inputs.json --tenant my-tenant --project my-project\n')
+  .requiredOption('--inputs <path>', 'Path to churn inputs JSON file')
+  .option('--tenant <id>', 'Tenant ID', 'default')
+  .option('--project <id>', 'Project ID', 'default')
+  .option('--profile <name>', 'Configuration profile (base, jobforge, settler, readylayer, aias, keys)', 'base')
+  .option('--output <path>', 'Output file path')
+  .option('--out <path>', 'Output file path (alias for --output)')
+  .option('--json', 'Emit structured JSON to stdout')
+  .action((options) => {
+    try {
+      const tenantValidation = validateTenantContext(options.tenant, options.project);
+      if (!tenantValidation.valid) {
+        exitWithEnvelope(createErrorEnvelope('SECURITY_ERROR', tenantValidation.error ?? 'Invalid tenant context'), options.json);
+      }
+
+      const inputsPath = resolve(options.inputs);
+      if (!existsSync(inputsPath)) {
+        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', 'Churn inputs file not found'), options.json);
+      }
+
+      const inputs: ChurnInputs = JSON.parse(readFileSync(inputsPath, 'utf-8'));
+      const profile = getProfile(options.profile);
+
+      const result = assessChurnRisk(inputs, {
+        tenantId: options.tenant,
+        projectId: options.project,
+        referenceDate: inputs.reference_date ?? new Date().toISOString(),
+        profile,
+      });
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        console.log(`\nChurn Risk Assessment (${options.profile} profile):`);
+        console.log(`  Customers assessed: ${result.stats.totalAssessed}`);
+        console.log(`  Average risk score: ${result.stats.averageScore.toFixed(1)}/100`);
+        console.log(`  Risk distribution:`, result.stats.byLevel);
+
+        if (result.revenue_at_risk) {
+          console.log(`\n  Revenue At Risk:`);
+          console.log(`    Total MRR:          $${(result.revenue_at_risk.total_mrr_cents / 100).toFixed(2)}`);
+          console.log(`    At-Risk MRR:        $${(result.revenue_at_risk.at_risk_mrr_cents / 100).toFixed(2)} (${result.revenue_at_risk.at_risk_percentage}%)`);
+          console.log(`    Critical-Risk MRR:   $${(result.revenue_at_risk.critical_risk_mrr_cents / 100).toFixed(2)}`);
+        }
+
+        if (result.risks.length > 0) {
+          console.log(`\n  Top At-Risk Customers:`);
+          for (const r of result.risks.slice(0, 5)) {
+            console.log(`    Customer ${r.customer_id}: ${r.risk_score}/100 [${r.risk_level.toUpperCase()}]`);
+            console.log(`      Reason: ${r.explanation}`);
+            if (r.recommended_actions[0]) {
+              console.log(`      Action: ${r.recommended_actions[0]}`);
+            }
+          }
+        }
+      }
+
+      const outPath = options.output ?? options.out;
+      if (outPath) {
+        writeFileSync(resolve(outPath), JSON.stringify(result, null, 2), 'utf-8');
+        if (!options.json) console.log(`\n  Written to: ${resolve(outPath)}`);
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// analyze — emit JobForge bundle + report
+// ---------------------------------------------------------------------------
+
+program
+  .command('analyze')
+  .description('Analyze billing data and emit JobForge-compatible artifacts')
+  .addHelpText('after', '\nExample:\n  finops analyze --inputs ./fixtures/jobforge/input.json --tenant t1 --project p1 --trace tr1 --out ./out/jobforge --stable-output\n')
+  .requiredOption('--inputs <path>', 'Path to analyze inputs JSON file')
+  .option('--tenant <id>', 'Tenant ID', 'default')
+  .option('--project <id>', 'Project ID', 'default')
+  .option('--trace <id>', 'Trace ID', 'trace-default')
+  .option('--out <dir>', 'Output directory', './out/jobforge')
+  .option('--stable-output', 'Produce deterministic stable hashes and timestamps', false)
+  .option('--json', 'Emit structured JSON to stdout')
+  .action((options) => {
+    try {
+      const inputsPath = resolve(options.inputs);
+      if (!existsSync(inputsPath)) {
+        exitWithEnvelope(createErrorEnvelope('NOT_FOUND', 'Inputs file not found'), options.json);
+      }
+
+      const rawInput = JSON.parse(readFileSync(inputsPath, 'utf-8'));
+      const inputs = AnalyzeInputsSchema.parse({
+        ...rawInput,
+        tenant_id: options.tenant,
+        project_id: options.project,
+        trace_id: options.trace,
+      });
+
+      const { jobRequestBundle, reportEnvelope } = analyze(inputs, {
+        stableOutput: options.stableOutput,
+      });
+
+      const outDir = resolve(options.out);
+      mkdirSync(outDir, { recursive: true });
+
+      const bundleJson = serializeCanonical(jobRequestBundle);
+      const reportJson = serializeCanonical(reportEnvelope);
+      const reportMd = renderReport(reportEnvelope, 'md');
+
+      writeFileSync(resolve(outDir, 'request-bundle.json'), bundleJson, 'utf-8');
+      writeFileSync(resolve(outDir, 'report.json'), reportJson, 'utf-8');
+      writeFileSync(resolve(outDir, 'report.md'), reportMd, 'utf-8');
+
+      const result = {
+        status: 'success',
+        out_dir: outDir,
+        job_requests_count: jobRequestBundle.requests.length,
+        findings_count: reportEnvelope.findings.length,
+        report_id: reportEnvelope.report_id,
+        canonical_hash: reportEnvelope.canonicalization.canonical_hash,
+      };
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        console.log(`\nJobForge Analysis Complete:`);
+        console.log(`  Job Requests: ${jobRequestBundle.requests.length}`);
+        console.log(`  Findings: ${reportEnvelope.findings.length}`);
+        console.log(`  Hash: ${reportEnvelope.canonicalization.canonical_hash}`);
+        console.log(`  Artifacts written to: ${outDir}`);
+        console.log(`    - request-bundle.json`);
+        console.log(`    - report.json`);
+        console.log(`    - report.md`);
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// health — check health and capability discovery
+// ---------------------------------------------------------------------------
+
+program
+  .command('health')
+  .description('Check system health and runner maturity capabilities')
+  .option('--json', 'Emit structured JSON to stdout')
+  .action((options) => {
+    try {
+      const health = getHealthStatus();
+      const capabilities = getCapabilityMetadata();
+      const result = { health, capabilities };
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        console.log(`\nFinOps Autopilot Health: [${health.status.toUpperCase()}]`);
+        console.log(`  Module: ${health.module_id}@${health.module_version}`);
+        console.log(`  Contracts Check: ${health.checks.contracts ? 'PASS' : 'FAIL'}`);
+        console.log(`  Schemas Check: ${health.checks.schemas ? 'PASS' : 'FAIL'}`);
+        console.log(`  Profiles Check: ${health.checks.profiles ? 'PASS' : 'FAIL'}`);
+        console.log(`\nCapabilities:`);
+        for (const cap of health.capabilities) {
+          console.log(`  ✓ ${cap}`);
+        }
+        console.log(`\nSupported JobForge Job Types:`);
+        for (const jt of capabilities.job_types) {
+          console.log(`  • ${jt.job_type}: ${jt.description}`);
+        }
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ---------------------------------------------------------------------------
+// cost-snapshot — generate deterministic cost report
+// ---------------------------------------------------------------------------
+
+program
+  .command('cost-snapshot')
+  .description('Generate deterministic cost snapshot and forecast')
+  .requiredOption('--tenant <id>', 'Tenant ID')
+  .requiredOption('--project <id>', 'Project ID')
+  .requiredOption('--period-start <iso>', 'Period start (ISO timestamp)')
+  .requiredOption('--period-end <iso>', 'Period end (ISO timestamp)')
+  .option('--events <path>', 'Path to billing events JSON file')
+  .option('--ledger <path>', 'Path to ledger state JSON file')
+  .option('--stable-output', 'Deterministic timestamps and hashes', false)
+  .option('--output <path>', 'Output file path')
+  .option('--out <path>', 'Output file path (alias for --output)')
+  .option('--json', 'Emit structured JSON to stdout')
+  .action((options) => {
+    try {
+      const tenantValidation = validateTenantContext(options.tenant, options.project);
+      if (!tenantValidation.valid) {
+        exitWithEnvelope(createErrorEnvelope('SECURITY_ERROR', tenantValidation.error ?? 'Invalid tenant context'), options.json);
+      }
+
+      let events = undefined;
+      if (options.events && existsSync(resolve(options.events))) {
+        events = JSON.parse(readFileSync(resolve(options.events), 'utf-8'));
+      }
+
+      let ledger = undefined;
+      if (options.ledger && existsSync(resolve(options.ledger))) {
+        ledger = JSON.parse(readFileSync(resolve(options.ledger), 'utf-8'));
+      }
+
+      const input = {
+        tenant_id: options.tenant,
+        project_id: options.project,
+        period_start: options.periodStart,
+        period_end: options.periodEnd,
+        billing_events: events,
+        ledger,
+        include_breakdown: true,
+        include_forecast: true,
+      };
+
+      const result = generateCostSnapshot(input, {
+        tenantId: options.tenant,
+        projectId: options.project,
+        periodStart: options.periodStart,
+        periodEnd: options.periodEnd,
+        stableOutput: options.stableOutput,
+      });
+
+      if ('refusal' in result) {
+        exitWithEnvelope(createErrorEnvelope('VALIDATION_ERROR', result.refusal), options.json);
+      }
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result.report, null, 2) + '\n');
+      } else {
+        console.log(`\nCost Snapshot (${options.periodStart} to ${options.periodEnd}):`);
+        console.log(`  Total Cost: $${(result.report.total_cost_cents / 100).toFixed(2)} ${result.report.currency}`);
+        console.log(`  Events: ${result.report.metadata.event_count} (Customers: ${result.report.metadata.customer_count})`);
+        console.log(`  Cache Key: ${result.report.metadata.cache_key}`);
+        console.log(`\n  Breakdown by Category:`);
+        for (const [cat, cents] of Object.entries(result.report.breakdown.by_category)) {
+          if (cents > 0) {
+            console.log(`    • ${cat}: $${(cents / 100).toFixed(2)}`);
+          }
+        }
+      }
+
+      const outPath = options.output ?? options.out;
+      if (outPath) {
+        writeFileSync(resolve(outPath), JSON.stringify(result.report, null, 2), 'utf-8');
+        if (!options.json) console.log(`\n  Written to: ${resolve(outPath)}`);
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
+
+// ----------------------------------------------------------------------------
+// demo — run deterministic demo with sample data
+// ----------------------------------------------------------------------------
+
+program
+  .command('demo')
+  .description('Run deterministic demo with sample data (no external secrets)')
+  .option('--out <dir>', 'Output directory', './demo-output')
+  .option('--json', 'Emit structured JSON to stdout')
+  .action(async (options) => {
+    try {
+      const outputDir = resolve(options.out);
+      mkdirSync(outputDir, { recursive: true });
+
+      if (!options.json) console.log('Running FinOps demo...');
+
+      const demoRunner = createFinOpsDemoRunner();
+      const result = await demoRunner.execute({});
+
+      if (options.json) {
+        process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+      } else {
+        if (result.status === 'success') {
+          console.log(`\nDemo completed successfully!`);
+          console.log(`Status: ${result.status}`);
+          console.log(`Output directory: ${outputDir}`);
+
+          if (result.output) {
+            writeFileSync(resolve(outputDir, 'result.json'), JSON.stringify(result, null, 2), 'utf-8');
 
             if (result.evidence && result.evidence[0]) {
               writeFileSync(resolve(outputDir, 'evidence.json'), JSON.stringify(result.evidence[0], null, 2), 'utf-8');
 
-              // Generate and write markdown summary
               const evidence = result.evidence[0] as Record<string, unknown>;
               const markdownSummary = `# FinOps Demo Evidence
 
@@ -338,19 +779,19 @@ ${(evidence.evidence as unknown[]).map((e: unknown) => {
               console.log(`Evidence written to: ${resolve(outputDir, 'evidence.md')}`);
             }
 
-             console.log(`Full results written to: ${resolve(outputDir, 'result.json')}`);
-           }
-         } else {
-           console.log(`\nDemo failed with status: ${result.status}`);
-           if (result.error) {
-             console.log(`Error: ${result.error.message}`);
-           }
-         }
-       }
-     } catch (err) {
-       handleCliError(err, options.json);
-     }
-   });
+            console.log(`Full results written to: ${resolve(outputDir, 'result.json')}`);
+          }
+        } else {
+          console.log(`\nDemo failed with status: ${result.status}`);
+          if (result.error) {
+            console.log(`Error: ${result.error.message}`);
+          }
+        }
+      }
+    } catch (err) {
+      handleCliError(err, options.json);
+    }
+  });
 
  program.parse();
 

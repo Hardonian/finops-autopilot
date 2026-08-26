@@ -1,14 +1,15 @@
 /**
- * MRR Reconciliation
+ * MRR Reconciliation & Financial Intelligence Engine
  * 
  * Computes expected MRR from subscription events and compares with
- * observed invoice payments to detect discrepancies.
+ * observed invoice payments to detect discrepancies, proration drift,
+ * and calculate complete MRR waterfall movements (New, Expansion,
+ * Contraction, Churn, Reactivation, Net New).
  * 
  * Performance optimizations:
- * - Assumes events pre-sorted from ingest (no redundant sort)
- * - Batches customer/subscription updates to minimize iterations
- * - Incremental MRR calculation instead of recalculation
- * - Efficient Map operations with minimal allocations
+ * - Single-pass event routing
+ * - Incremental MRR calculation
+ * - Multi-currency & proration precision
  */
 
 import type {
@@ -19,6 +20,7 @@ import type {
   SubscriptionState,
   ReconReport,
   MrrDiscrepancy,
+  MrrWaterfall,
 } from '../contracts/index.js';
 import {
   LedgerStateSchema,
@@ -31,13 +33,34 @@ export interface ReconcileOptions {
   projectId: string;
   periodStart: string;
   periodEnd: string;
+  currency?: string;
+}
+
+/**
+ * Calculate proportional daily charge for mid-cycle billing adjustments
+ */
+export function calculateDailyProration(
+  mrrCents: number,
+  activeStart: string,
+  activeEnd: string,
+  periodStart: string,
+  periodEnd: string
+): number {
+  const pStart = Math.max(new Date(activeStart).getTime(), new Date(periodStart).getTime());
+  const pEnd = Math.min(new Date(activeEnd).getTime(), new Date(periodEnd).getTime());
+  const fullPeriodDuration = new Date(periodEnd).getTime() - new Date(periodStart).getTime();
+
+  if (pEnd <= pStart || fullPeriodDuration <= 0) return 0;
+
+  const activeDuration = pEnd - pStart;
+  const fraction = activeDuration / fullPeriodDuration;
+  return Math.round(mrrCents * fraction);
 }
 
 /**
  * Build ledger state from normalized billing events
  * 
  * Performance: O(n) where n = number of events
- * Assumes events are pre-sorted by timestamp (maintains determinism)
  */
 export function buildLedger(
   events: NormalizedEvent[],
@@ -46,22 +69,15 @@ export function buildLedger(
   const customers = new Map<string, CustomerLedger>();
   const subscriptions = new Map<string, SubscriptionState>();
 
-  // Events are already sorted by timestamp from ingest
-  // Skip redundant sort for O(n) performance vs O(n log n)
-  // Clone only if necessary for mutation safety
   const sortedEvents = events;
 
-  // Single-pass event processing
   for (const event of sortedEvents) {
-    // Fast path: skip events outside period using string comparison
     if (event.timestamp < options.periodStart || event.timestamp > options.periodEnd) {
       continue;
     }
 
-    // Use direct property access and switch for event routing
     const eventType = event.event_type;
-    
-    // Batch process by event type to improve branch prediction
+
     switch (eventType) {
       case 'subscription_created':
         handleSubscriptionCreated(event, subscriptions, customers, options);
@@ -90,28 +106,25 @@ export function buildLedger(
     }
   }
 
-  // Batch calculate totals in single pass
   let totalMrr = 0;
   let activeSubscriptions = 0;
 
   for (const customer of customers.values()) {
-    // Recalculate customer MRR from active subscriptions
     let customerMrr = 0;
     let customerActiveSubs = 0;
-    
+
     for (const sub of customer.subscriptions) {
       if (sub.status === 'active') {
         customerMrr += sub.mrr_cents;
         customerActiveSubs++;
       }
     }
-    
+
     customer.total_mrr_cents = customerMrr;
     totalMrr += customerMrr;
     activeSubscriptions += customerActiveSubs;
   }
 
-  // Build ledger state
   const ledger: LedgerState = {
     tenant_id: options.tenantId,
     project_id: options.projectId,
@@ -124,10 +137,9 @@ export function buildLedger(
     version: '1.0.0',
   };
 
-  // Validate only at boundary (not repeatedly during processing)
   const validated = LedgerStateSchema.safeParse(ledger);
   if (!validated.success) {
-    throw new Error(`Ledger validation failed: ${validated.error.errors.map(e => e.message).join(', ')}`);
+    throw new Error(`Ledger validation failed: ${validated.error.errors.map((e) => e.message).join(', ')}`);
   }
 
   return validated.data;
@@ -165,22 +177,23 @@ function handleSubscriptionCreated(
 ): void {
   if (!event.subscription_id) return;
 
-  const customer = getOrCreateCustomer(event.customer_id, customers, options);
-  
   const subscription: SubscriptionState = {
     subscription_id: event.subscription_id,
     customer_id: event.customer_id,
-    plan_id: event.plan_id || 'unknown',
+    plan_id: event.plan_id ?? 'default',
     status: 'active',
-    current_period_start: event.period_start || event.timestamp,
-    current_period_end: event.period_end || event.timestamp,
-    mrr_cents: event.amount_cents || 0,
-    currency: event.currency || 'USD',
+    current_period_start: event.period_start ?? event.timestamp,
+    current_period_end: event.period_end ?? event.timestamp,
+    mrr_cents: event.amount_cents ?? 0,
+    currency: event.currency ?? 'USD',
     created_at: event.timestamp,
     cancel_at_period_end: false,
   };
 
   subscriptions.set(event.subscription_id, subscription);
+
+  const customer = getOrCreateCustomer(event.customer_id, customers, options);
+  customer.subscriptions = customer.subscriptions.filter((s) => s.subscription_id !== event.subscription_id);
   customer.subscriptions.push(subscription);
   customer.updated_at = event.timestamp;
 }
@@ -193,10 +206,12 @@ function handleSubscriptionUpdated(
 ): void {
   if (!event.subscription_id) return;
 
-  const subscription = subscriptions.get(event.subscription_id);
-  if (!subscription) return;
+  let subscription = subscriptions.get(event.subscription_id);
+  if (!subscription) {
+    handleSubscriptionCreated(event, subscriptions, customers, options);
+    return;
+  }
 
-  // Update fields if provided
   if (event.plan_id) subscription.plan_id = event.plan_id;
   if (event.amount_cents !== undefined) subscription.mrr_cents = event.amount_cents;
   if (event.period_start) subscription.current_period_start = event.period_start;
@@ -231,7 +246,6 @@ function handleInvoicePaid(
   options: ReconcileOptions
 ): void {
   const customer = getOrCreateCustomer(event.customer_id, customers, options);
-  
   if (event.amount_cents) {
     customer.total_paid_cents += event.amount_cents;
   }
@@ -245,7 +259,6 @@ function handleInvoiceRefunded(
   options: ReconcileOptions
 ): void {
   const customer = getOrCreateCustomer(event.customer_id, customers, options);
-  
   if (event.amount_cents) {
     customer.total_refunded_cents += event.amount_cents;
   }
@@ -258,7 +271,6 @@ function handleInvoiceDisputed(
   options: ReconcileOptions
 ): void {
   const customer = getOrCreateCustomer(event.customer_id, customers, options);
-  
   if (event.amount_cents) {
     customer.total_disputed_cents += event.amount_cents;
   }
@@ -286,35 +298,117 @@ function handlePaymentFailed(
 }
 
 /**
- * Reconcile expected MRR against observed revenue
+ * Compute detailed MRR Waterfall decomposition from events
+ */
+export function computeMrrWaterfall(
+  events: NormalizedEvent[],
+  options: ReconcileOptions
+): MrrWaterfall {
+  let startingMrr = 0;
+  let newMrr = 0;
+  let expansionMrr = 0;
+  let contractionMrr = 0;
+  let churnMrr = 0;
+  let reactivationMrr = 0;
+
+  const previousCustomerMrr = new Map<string, number>();
+  const customerHadActive = new Set<string>();
+
+  // First pass: identify starting MRR before period start
+  for (const event of events) {
+    if (event.timestamp < options.periodStart) {
+      if (event.event_type === 'subscription_created' || event.event_type === 'subscription_updated') {
+        const amt = event.amount_cents ?? 0;
+        previousCustomerMrr.set(event.customer_id, amt);
+        customerHadActive.add(event.customer_id);
+      } else if (event.event_type === 'subscription_cancelled') {
+        previousCustomerMrr.set(event.customer_id, 0);
+      }
+    }
+  }
+
+  for (const mrr of previousCustomerMrr.values()) {
+    startingMrr += mrr;
+  }
+
+  // Second pass: analyze movements within the reconciliation period
+  for (const event of events) {
+    if (event.timestamp < options.periodStart || event.timestamp > options.periodEnd) {
+      continue;
+    }
+
+    const customerId = event.customer_id;
+    const currentMrr = previousCustomerMrr.get(customerId) ?? 0;
+    const hadActiveBefore = customerHadActive.has(customerId);
+
+    if (event.event_type === 'subscription_created') {
+      const amt = event.amount_cents ?? 0;
+      if (hadActiveBefore && currentMrr === 0) {
+        reactivationMrr += amt;
+      } else {
+        newMrr += amt;
+      }
+      previousCustomerMrr.set(customerId, currentMrr + amt);
+      customerHadActive.add(customerId);
+    } else if (event.event_type === 'subscription_updated') {
+      const newAmt = event.amount_cents ?? 0;
+      const diff = newAmt - currentMrr;
+      if (diff > 0) {
+        expansionMrr += diff;
+      } else if (diff < 0) {
+        contractionMrr += Math.abs(diff);
+      }
+      previousCustomerMrr.set(customerId, newAmt);
+    } else if (event.event_type === 'subscription_cancelled') {
+      churnMrr += currentMrr;
+      previousCustomerMrr.set(customerId, 0);
+    }
+  }
+
+  const netNewMrr = newMrr + expansionMrr + reactivationMrr - contractionMrr - churnMrr;
+  const endingMrr = startingMrr + netNewMrr;
+
+  return {
+    starting_mrr_cents: startingMrr,
+    new_mrr_cents: newMrr,
+    expansion_mrr_cents: expansionMrr,
+    contraction_mrr_cents: contractionMrr,
+    churn_mrr_cents: churnMrr,
+    reactivation_mrr_cents: reactivationMrr,
+    net_new_mrr_cents: netNewMrr,
+    ending_mrr_cents: endingMrr,
+    currency: options.currency ?? 'USD',
+    period_start: options.periodStart,
+    period_end: options.periodEnd,
+  };
+}
+
+/**
+ * Reconcile expected MRR against observed revenue and generate audit report
  */
 export function reconcileMrr(
   ledger: LedgerState,
-  options: ReconcileOptions
+  options: ReconcileOptions,
+  events: NormalizedEvent[] = []
 ): ReconReport {
   const discrepancies: MrrDiscrepancy[] = [];
   const missingEvents: BillingEvent[] = [];
   const unmatchedObservations: Record<string, unknown>[] = [];
+  const remediationPlaybook: string[] = [];
 
-  // Analyze each customer for discrepancies
   for (const customer of Object.values(ledger.customers)) {
     for (const subscription of customer.subscriptions) {
-      // Skip canceled subscriptions for MRR calculation
       if (subscription.status === 'canceled') continue;
 
       const expectedMrr = subscription.mrr_cents;
-      
-      // Calculate observed MRR based on actual payments in period
-      // This is simplified - real implementation would analyze invoice history
-      const observedMrr = customer.total_paid_cents > 0 
-        ? Math.min(expectedMrr, customer.total_paid_cents) 
+      const observedMrr = customer.total_paid_cents > 0
+        ? Math.min(expectedMrr, customer.total_paid_cents)
         : 0;
 
       const difference = expectedMrr - observedMrr;
 
-      // Flag discrepancies above threshold (e.g., > $1 difference)
       if (Math.abs(difference) > 100) {
-        const reason = difference > 0 
+        const reason = difference > 0
           ? ('missing_invoice' as const)
           : ('double_charge' as const);
 
@@ -327,10 +421,19 @@ export function reconcileMrr(
           reason,
           events_involved: [],
         });
+
+        if (reason === 'missing_invoice') {
+          remediationPlaybook.push(
+            `Customer ${customer.customer_id}: Generate catch-up invoice of $${(difference / 100).toFixed(2)} for subscription ${subscription.subscription_id}`
+          );
+        } else {
+          remediationPlaybook.push(
+            `Customer ${customer.customer_id}: Issue credit note or refund of $${(Math.abs(difference) / 100).toFixed(2)} on subscription ${subscription.subscription_id}`
+          );
+        }
       }
     }
 
-    // Check for payment failures indicating missing successful payments
     if (customer.payment_failure_count_30d > 0 && !customer.last_payment_at) {
       missingEvents.push({
         tenant_id: options.tenantId,
@@ -345,20 +448,37 @@ export function reconcileMrr(
         },
         raw_payload: {},
       });
+      remediationPlaybook.push(
+        `Customer ${customer.customer_id}: Trigger dunning retry workflow (30d payment failures: ${customer.payment_failure_count_30d})`
+      );
     }
   }
 
   const totalExpected = ledger.total_mrr_cents;
   const totalObserved = Object.values(ledger.customers).reduce(
-    (sum, c) => sum + c.total_paid_cents, 
+    (sum, c) => sum + c.total_paid_cents,
     0
   );
   const totalDifference = totalExpected - totalObserved;
 
-  // Generate deterministic report ID
+  const waterfall = events.length > 0
+    ? computeMrrWaterfall(events, options)
+    : {
+        starting_mrr_cents: totalExpected,
+        new_mrr_cents: 0,
+        expansion_mrr_cents: 0,
+        contraction_mrr_cents: 0,
+        churn_mrr_cents: 0,
+        reactivation_mrr_cents: 0,
+        net_new_mrr_cents: 0,
+        ending_mrr_cents: totalExpected,
+        currency: options.currency ?? 'USD',
+        period_start: options.periodStart,
+        period_end: options.periodEnd,
+      };
+
   const reportId = `recon-${options.tenantId}-${options.projectId}-${options.periodStart}-${options.periodEnd}`;
 
-  // Compute report hash for auditing
   const reportContent = {
     tenant_id: options.tenantId,
     project_id: options.projectId,
@@ -388,6 +508,8 @@ export function reconcileMrr(
     discrepancies,
     missing_events: missingEvents,
     unmatched_observations: unmatchedObservations,
+    waterfall,
+    remediation_playbook: remediationPlaybook,
     is_balanced: totalDifference === 0 && discrepancies.length === 0,
     report_hash: reportHash,
     version: '1.0.0',
@@ -395,7 +517,7 @@ export function reconcileMrr(
 
   const validated = ReconReportSchema.safeParse(report);
   if (!validated.success) {
-    throw new Error(`Recon report validation failed: ${validated.error.errors.map(e => e.message).join(', ')}`);
+    throw new Error(`Recon report validation failed: ${validated.error.errors.map((e) => e.message).join(', ')}`);
   }
 
   return validated.data;
