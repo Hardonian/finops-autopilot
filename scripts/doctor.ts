@@ -34,7 +34,7 @@ function addResult(result: CheckResult): void {
 }
 
 function getCommandOutput(cmd: string, args: string[]): string | null {
-  const result = spawnSync(cmd, args, { encoding: 'utf-8', timeout: 10_000 });
+  const result = spawnSync(cmd, args, { encoding: 'utf-8', timeout: 10_000, shell: true });
   if (result.status !== 0) return null;
   return (result.stdout ?? '').trim();
 }

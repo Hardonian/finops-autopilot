@@ -136,5 +136,113 @@ describe('Anomalies', () => {
       );
       expect(doubleChargeAnomalies.length).toBeGreaterThan(0);
     });
+
+    it('should detect statistical outlier spikes with high Z-scores', () => {
+      const regularPayments: NormalizedEvent[] = Array.from({ length: 20 }, (_, i) => ({
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        event_id: `evt_reg_${i}`,
+        event_type: 'invoice_paid',
+        timestamp: `2024-01-${(i + 1).toString().padStart(2, '0')}T10:00:00Z`,
+        customer_id: `cus_${i}`,
+        amount_cents: 5000,
+        currency: 'USD',
+        metadata: {},
+        raw_payload: {},
+        normalized_at: '2024-01-15T10:00:00Z',
+        source_hash: `hash_${i}`,
+        validation_errors: [],
+      }));
+
+      // Outlier spike of $50,000 compared to $50 mean
+      regularPayments.push({
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        event_id: 'evt_spike',
+        event_type: 'invoice_paid',
+        timestamp: '2024-01-25T10:00:00Z',
+        customer_id: 'cus_spike',
+        amount_cents: 5000000,
+        currency: 'USD',
+        metadata: {},
+        raw_payload: {},
+        normalized_at: '2024-01-25T10:00:00Z',
+        source_hash: 'hash_spike',
+        validation_errors: [],
+      });
+
+      const ledger: LedgerState = {
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        computed_at: '2024-01-25T10:00:00Z',
+        customers: {},
+        total_mrr_cents: 100000,
+        total_customers: 21,
+        active_subscriptions: 21,
+        event_count: regularPayments.length,
+        version: '1.0.0',
+      };
+
+      const result = detectAnomalies(regularPayments, ledger, {
+        tenantId: 'test-tenant',
+        projectId: 'test-project',
+        referenceDate: '2024-01-25T10:00:00Z',
+      });
+
+      const spikes = result.anomalies.filter((a) => a.metadata && 'z_score' in a.metadata);
+      expect(spikes.length).toBeGreaterThan(0);
+      expect(spikes[0].customer_id).toBe('cus_spike');
+    });
+
+    it('should detect ghost subscriptions with long inactivity', () => {
+      const ledger: LedgerState = {
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        computed_at: '2024-05-01T10:00:00Z',
+        customers: {
+          cus_ghost: {
+            customer_id: 'cus_ghost',
+            tenant_id: 'test-tenant',
+            project_id: 'test-project',
+            subscriptions: [
+              {
+                subscription_id: 'sub_ghost_1',
+                customer_id: 'cus_ghost',
+                plan_id: 'plan_enterprise',
+                status: 'active',
+                current_period_start: '2024-01-01T00:00:00Z',
+                current_period_end: '2024-02-01T00:00:00Z',
+                mrr_cents: 20000,
+                currency: 'USD',
+                created_at: '2024-01-01T00:00:00Z',
+                cancel_at_period_end: false,
+              },
+            ],
+            total_mrr_cents: 20000,
+            total_paid_cents: 20000,
+            total_refunded_cents: 0,
+            total_disputed_cents: 0,
+            payment_failure_count_30d: 0,
+            last_invoice_at: '2024-01-01T00:00:00Z', // 120 days inactive
+            updated_at: '2024-01-01T00:00:00Z',
+          },
+        },
+        total_mrr_cents: 20000,
+        total_customers: 1,
+        active_subscriptions: 1,
+        event_count: 0,
+        version: '1.0.0',
+      };
+
+      const result = detectAnomalies([], ledger, {
+        tenantId: 'test-tenant',
+        projectId: 'test-project',
+        referenceDate: '2024-05-01T10:00:00Z',
+      });
+
+      const ghosts = result.anomalies.filter((a) => a.metadata && 'days_inactive' in a.metadata);
+      expect(ghosts.length).toBeGreaterThan(0);
+      expect(ghosts[0].subscription_id).toBe('sub_ghost_1');
+    });
   });
 });

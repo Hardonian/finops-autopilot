@@ -165,4 +165,68 @@ describe('Churn', () => {
       expect(serialized).not.toContain('token');
     });
   });
+
+  describe('Revenue At Risk calculations', () => {
+    it('should accurately calculate total and critical MRR at risk across cohorts', () => {
+      const ledger: LedgerState = {
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        computed_at: '2024-01-15T10:00:00Z',
+        customers: {
+          cus_high_risk: {
+            customer_id: 'cus_high_risk',
+            tenant_id: 'test-tenant',
+            project_id: 'test-project',
+            subscriptions: [],
+            total_mrr_cents: 80000,
+            total_paid_cents: 0,
+            total_refunded_cents: 0,
+            total_disputed_cents: 0,
+            payment_failure_count_30d: 6,
+            updated_at: '2024-01-15T10:00:00Z',
+          },
+          cus_healthy: {
+            customer_id: 'cus_healthy',
+            tenant_id: 'test-tenant',
+            project_id: 'test-project',
+            subscriptions: [],
+            total_mrr_cents: 120000,
+            total_paid_cents: 120000,
+            total_refunded_cents: 0,
+            total_disputed_cents: 0,
+            payment_failure_count_30d: 0,
+            last_payment_at: '2024-01-14T10:00:00Z',
+            updated_at: '2024-01-15T10:00:00Z',
+          },
+        },
+        total_mrr_cents: 200000,
+        total_customers: 2,
+        active_subscriptions: 2,
+        event_count: 2,
+        version: '1.0.0',
+      };
+
+      const inputs: ChurnInputs = {
+        tenant_id: 'test-tenant',
+        project_id: 'test-project',
+        ledger,
+        usage_metrics: [],
+        support_tickets: [],
+        plan_downgrades: [],
+        reference_date: '2024-01-15T10:00:00Z',
+      };
+
+      const result = assessChurnRisk(inputs, {
+        tenantId: 'test-tenant',
+        projectId: 'test-project',
+        referenceDate: '2024-01-15T10:00:00Z',
+      });
+
+      expect(result.revenue_at_risk).toBeDefined();
+      expect(result.revenue_at_risk?.total_mrr_cents).toBe(200000);
+      expect(result.revenue_at_risk?.at_risk_mrr_cents).toBe(80000);
+      expect(result.revenue_at_risk?.at_risk_percentage).toBe(40);
+      expect(result.revenue_at_risk?.top_risk_customers[0].customer_id).toBe('cus_high_risk');
+    });
+  });
 });

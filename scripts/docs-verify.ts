@@ -54,9 +54,11 @@ run('node', [
 const expectedFiles = ['request-bundle.json', 'report.json', 'report.md'];
 
 for (const file of expectedFiles) {
-  const actual = readFileSync(resolve(outputDir, file), 'utf-8');
-  const expected = readFileSync(resolve(expectedDir, file), 'utf-8');
+  const actual = readFileSync(resolve(outputDir, file), 'utf-8').replace(/\r\n/g, '\n');
+  const expected = readFileSync(resolve(expectedDir, file), 'utf-8').replace(/\r\n/g, '\n');
   if (actual !== expected) {
     throw new Error(`Docs verify mismatch for ${file}`);
   }
 }
+
+
