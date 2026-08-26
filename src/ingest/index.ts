@@ -15,7 +15,6 @@
 import { createHash } from 'crypto';
 import type {
   BillingEvent,
-  BillingEventType,
   NormalizedEvent,
   TenantId,
   ProjectId,
@@ -252,69 +251,97 @@ function mapGenericCsvRecord(
   };
 }
 
-function mapStripeRecord(row: Record<string, unknown>, index: number): Record<string, unknown> {
-  const stripeType = String(row['type'] || row['event_type'] || 'invoice.paid').toLowerCase();
-  let eventType: BillingEventType = 'invoice_paid';
+function getField(obj: Record<string, unknown>, ...fieldNames: string[]): unknown {
+  const lowerMap = new Map<string, unknown>();
+  for (const [k, v] of Object.entries(obj)) {
+    lowerMap.set(k.toLowerCase(), v);
+  }
+  for (const name of fieldNames) {
+    if (obj[name] !== undefined) return obj[name];
+    const lower = name.toLowerCase();
+    if (lowerMap.has(lower)) return lowerMap.get(lower);
+  }
+  return undefined;
+}
 
-  if (stripeType.includes('subscription.created') || stripeType.includes('customer.subscription.created')) {
+function mapStripeRecord(raw: Record<string, unknown>, index = 0): Record<string, unknown> {
+  const dataObj = (raw['data'] && typeof raw['data'] === 'object' && (raw['data'] as Record<string, unknown>)['object'])
+    ? ((raw['data'] as Record<string, unknown>)['object'] as Record<string, unknown>)
+    : raw;
+
+  const stripeType = String(raw['type'] || dataObj['type'] || '');
+  let eventType = 'invoice_paid';
+  if (stripeType.includes('customer.subscription.created')) {
     eventType = 'subscription_created';
-  } else if (stripeType.includes('subscription.updated') || stripeType.includes('customer.subscription.updated')) {
-    eventType = 'subscription_updated';
-  } else if (stripeType.includes('subscription.deleted') || stripeType.includes('customer.subscription.deleted')) {
+  } else if (stripeType.includes('customer.subscription.deleted') || stripeType.includes('customer.subscription.canceled')) {
     eventType = 'subscription_cancelled';
-  } else if (stripeType.includes('charge.refunded') || stripeType.includes('refund.created')) {
-    eventType = 'invoice_refunded';
-  } else if (stripeType.includes('dispute.created')) {
-    eventType = 'invoice_disputed';
-  } else if (stripeType.includes('payment_intent.payment_failed') || stripeType.includes('invoice.payment_failed')) {
+  } else if (stripeType.includes('customer.subscription.updated')) {
+    eventType = 'subscription_updated';
+  } else if (stripeType.includes('invoice.payment_failed') || stripeType.includes('charge.failed')) {
     eventType = 'payment_failed';
   } else if (stripeType.includes('charge.succeeded') || stripeType.includes('payment_intent.succeeded')) {
     eventType = 'payment_succeeded';
   }
 
-  const rawAmount = row['amount'] || row['amount_paid'] || row['total'];
+  const rawAmount = dataObj['amount'] || dataObj['amount_paid'] || dataObj['total'] || (dataObj['plan'] && typeof dataObj['plan'] === 'object' ? (dataObj['plan'] as Record<string, unknown>)['amount'] : undefined);
   const amountCents = rawAmount ? Math.round(parseFloat(String(rawAmount))) : undefined;
+  const planId = (dataObj['plan'] && typeof dataObj['plan'] === 'object' && (dataObj['plan'] as Record<string, unknown>)['id'])
+    ? String((dataObj['plan'] as Record<string, unknown>)['id'])
+    : (dataObj['plan'] ? String(dataObj['plan']) : undefined);
 
   return {
-    event_id: String(row['id'] || `stripe_evt_${index + 1}`),
+    event_id: String(raw['id'] || dataObj['id'] || `stripe_evt_${index + 1}`),
     event_type: eventType,
-    timestamp: row['created'] ? new Date(Number(row['created']) * 1000).toISOString() : new Date().toISOString(),
-    customer_id: String(row['customer'] || row['customer_id'] || 'cust_stripe'),
-    subscription_id: row['subscription'] ? String(row['subscription']) : undefined,
-    invoice_id: row['invoice'] ? String(row['invoice']) : undefined,
-    plan_id: row['plan'] ? String(row['plan']) : undefined,
+    timestamp: raw['created'] || dataObj['created'] ? new Date(Number(raw['created'] || dataObj['created']) * 1000).toISOString() : new Date().toISOString(),
+    customer_id: String(dataObj['customer'] || dataObj['customer_id'] || raw['customer'] || 'cust_stripe'),
+    subscription_id: dataObj['subscription'] || (dataObj['id'] && String(dataObj['id']).startsWith('sub_')) ? String(dataObj['subscription'] || dataObj['id']) : undefined,
+    invoice_id: dataObj['invoice'] ? String(dataObj['invoice']) : undefined,
+    plan_id: planId,
     amount_cents: amountCents,
-    currency: String(row['currency'] || 'USD').toUpperCase(),
-    metadata: row,
+    currency: String(dataObj['currency'] || raw['currency'] || 'USD').toUpperCase(),
+    metadata: raw,
   };
 }
 
-function mapAwsCurRecord(row: Record<string, unknown>, index: number): Record<string, unknown> {
-  const cost = parseFloat(String(row['lineitem/unblendedcost'] || row['cost'] || 0));
+function mapAwsCurRecord(row: Record<string, unknown>, index = 0): Record<string, unknown> {
+  const rawCost = getField(row, 'lineItem/UnblendedCost', 'lineitem/unblendedcost', 'pricing/publicOnDemandCost', 'cost');
+  const cost = parseFloat(String(rawCost || 0));
   const amountCents = Math.round(cost * 100);
 
+  const eventId = String(getField(row, 'identity/LineItemId', 'identity/lineitemid') || `aws_cur_${index + 1}`);
+  const timestamp = String(getField(row, 'lineItem/UsageStartDate', 'lineitem/usagestartdate') || new Date().toISOString());
+  const customerId = String(getField(row, 'lineItem/UsageAccountId', 'lineitem/usageaccountid') || 'aws_account');
+  const planId = String(getField(row, 'lineItem/ProductCode', 'product/productname') || 'aws_service');
+  const currency = String(getField(row, 'lineItem/CurrencyCode', 'pricing/currency') || 'USD').toUpperCase();
+
   return {
-    event_id: String(row['identity/lineitemid'] || `aws_cur_${index + 1}`),
+    event_id: eventId,
     event_type: 'usage_recorded',
-    timestamp: String(row['lineitem/usagestartdate'] || new Date().toISOString()),
-    customer_id: String(row['lineitem/usageaccountid'] || 'aws_account'),
-    plan_id: String(row['product/productname'] || 'aws_service'),
+    timestamp: timestamp,
+    customer_id: customerId,
+    plan_id: planId,
     amount_cents: amountCents,
-    currency: String(row['pricing/currency'] || 'USD').toUpperCase(),
+    currency: currency,
     metadata: row,
   };
 }
 
-function mapGcpBillingRecord(row: Record<string, unknown>, index: number): Record<string, unknown> {
+function mapGcpBillingRecord(row: Record<string, unknown>, index = 0): Record<string, unknown> {
   const cost = parseFloat(String(row['cost'] || 0));
   const amountCents = Math.round(cost * 100);
+
+  const projectObj = row['project'] && typeof row['project'] === 'object' ? (row['project'] as Record<string, unknown>) : undefined;
+  const customerId = String(projectObj?.['id'] || row['project_id'] || row['project.id'] || 'gcp_project');
+
+  const serviceObj = row['service'] && typeof row['service'] === 'object' ? (row['service'] as Record<string, unknown>) : undefined;
+  const planId = String(serviceObj?.['description'] || serviceObj?.['id'] || row['service.description'] || 'gcp_service');
 
   return {
     event_id: String(row['id'] || `gcp_billing_${index + 1}`),
     event_type: 'usage_recorded',
     timestamp: String(row['usage_start_time'] || new Date().toISOString()),
-    customer_id: String(row['project_id'] || row['project.id'] || 'gcp_project'),
-    plan_id: String(row['service.description'] || row['service_description'] || 'gcp_service'),
+    customer_id: customerId,
+    plan_id: planId,
     amount_cents: amountCents,
     currency: String(row['currency'] || 'USD').toUpperCase(),
     metadata: row,
@@ -350,17 +377,21 @@ export function parseJsonlBillingEvents(jsonlContent: string): unknown[] {
  * @param options - Ingestion options including tenant, project, and format
  */
 export function ingestEvents(
-  rawEvents: unknown[],
+  rawEvents: unknown[] | string,
   options: IngestOptions
 ): IngestResult {
+  if (typeof rawEvents === 'string') {
+    return ingestAny(rawEvents, options);
+  }
+
   const events: NormalizedEvent[] = [];
   const errors: IngestError[] = [];
   const byType: Record<string, number> = {};
-  const seenEventKeys = new Set<string>();
+  const seenEventKeys = new Map<string, number>();
   let duplicateCount = 0;
 
   for (let index = 0; index < rawEvents.length; index++) {
-    const raw = rawEvents[index];
+    let raw = rawEvents[index];
 
     try {
       if (typeof raw !== 'object' || raw === null) {
@@ -372,7 +403,32 @@ export function ingestEvents(
         continue;
       }
 
+      // Apply provider normalization if format specified
+      if (options.format === 'stripe') {
+        raw = mapStripeRecord(raw as Record<string, unknown>);
+      } else if (options.format === 'aws_cur') {
+        raw = mapAwsCurRecord(raw as Record<string, unknown>);
+      } else if (options.format === 'gcp_billing') {
+        raw = mapGcpBillingRecord(raw as Record<string, unknown>);
+      }
+
       const rawAsRecord = raw as Record<string, unknown>;
+
+      // Deduplication check
+      const eventId = String(rawAsRecord.event_id ?? `evt_${index}`);
+      const timestampMs = new Date(String(rawAsRecord.timestamp ?? new Date().toISOString())).getTime();
+      const dedupKey = `${eventId}_${rawAsRecord.customer_id ?? 'unknown'}`;
+
+      if (options.dedupWindowSeconds && seenEventKeys.has(dedupKey)) {
+        const lastSeenMs = seenEventKeys.get(dedupKey)!;
+        const diffSeconds = Math.abs(timestampMs - lastSeenMs) / 1000;
+        if (diffSeconds <= options.dedupWindowSeconds) {
+          duplicateCount++;
+          continue;
+        }
+      }
+      seenEventKeys.set(dedupKey, timestampMs);
+
       const withContext: Record<string, unknown> = {
         tenant_id: options.tenantId,
         project_id: options.projectId,
@@ -408,14 +464,6 @@ export function ingestEvents(
         baseEvent = withContext as unknown as BillingEvent;
       } else {
         baseEvent = parseResult.data;
-      }
-
-      // Time-window deduplication check
-      const dedupKey = `${baseEvent.event_type}_${baseEvent.customer_id}_${baseEvent.subscription_id ?? ''}_${baseEvent.amount_cents ?? ''}_${baseEvent.timestamp}`;
-      if (seenEventKeys.has(dedupKey)) {
-        duplicateCount++;
-      } else {
-        seenEventKeys.add(dedupKey);
       }
 
       const normalizedAt = new Date().toISOString();
@@ -470,7 +518,7 @@ export function ingestEvents(
     events,
     errors,
     stats: {
-      total: rawEvents.length,
+      total: typeof rawEvents === 'string' ? events.length + errors.length + duplicateCount : rawEvents.length,
       valid: events.length,
       invalid: errors.length,
       duplicates: duplicateCount,
@@ -492,16 +540,16 @@ export function ingestAny(
 
   if (typeof source === 'string') {
     const trimmed = source.trim();
+    if (options.format === 'jsonl' || trimmed.includes('\n{"') || (trimmed.startsWith('{') && trimmed.includes('\n{'))) {
+      const parsed = parseJsonlBillingEvents(trimmed);
+      return ingestEvents(parsed, options);
+    }
     if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
       const parsed = JSON.parse(trimmed) as unknown[];
       return ingestEvents(parsed, options);
     }
     if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       const parsed = [JSON.parse(trimmed)];
-      return ingestEvents(parsed, options);
-    }
-    if (options.format === 'jsonl' || (!options.format && trimmed.includes('\n') && trimmed.startsWith('{'))) {
-      const parsed = parseJsonlBillingEvents(trimmed);
       return ingestEvents(parsed, options);
     }
 

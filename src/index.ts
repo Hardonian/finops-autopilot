@@ -39,6 +39,10 @@ export {
   LogLevelSchema,
   ErrorEnvelopeSchema,
   ErrorCodeSchema,
+  MrrWaterfallSchema,
+  IngestFormatSchema,
+  CustomerHealthTierSchema,
+  RevenueAtRiskSchema,
 } from './contracts/index.js';
 
 export type {
@@ -50,6 +54,10 @@ export type {
   SubscriptionState,
   ReconReport,
   MrrDiscrepancy,
+  MrrWaterfall,
+  IngestFormat,
+  CustomerHealthTier,
+  RevenueAtRisk,
   Anomaly,
   AnomalyType,
   AnomalySeverity,
@@ -79,6 +87,11 @@ export type {
 // Ingest
 export {
   ingestEvents,
+  ingestAny,
+  detectCsvDelimiter,
+  parseCsvRows,
+  parseCsvBillingEvents,
+  parseJsonlBillingEvents,
   serializeEvents,
   loadEvents,
 } from './ingest/index.js';
@@ -94,6 +107,8 @@ export type {
 export {
   buildLedger,
   reconcileMrr,
+  computeMrrWaterfall,
+  calculateDailyProration,
 } from './reconcile/index.js';
 
 export type {
@@ -113,6 +128,7 @@ export type {
 // Churn
 export {
   assessChurnRisk,
+  calculateRevenueAtRisk,
 } from './churn/index.js';
 
 export type {
@@ -171,6 +187,10 @@ export type {
 export {
   buildRunnerMetricsReport,
   validateRunnerMetric,
+  createRunnerMetric,
+  calculatePercentileLatencies,
+  calculateSuccessRate,
+  evaluateCostRiskGuards,
   serializeRunnerMetricsReport,
 } from './metrics/index.js';
 
@@ -208,3 +228,4 @@ export type {
   RunnerContract,
   RunnerExecuteResult,
 } from './runner-contract.js';
+

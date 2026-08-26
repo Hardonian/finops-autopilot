@@ -282,7 +282,7 @@ evt_semi_1;subscription_created;2024-01-15T10:00:00Z;cus_200;4900;EUR`;
       const result = ingestEvents(duplicatedEvents, {
         tenantId: 'test-tenant',
         projectId: 'test-project',
-        deduplicateWindowSeconds: 300,
+        dedupWindowSeconds: 300,
       });
 
       expect(result.stats.total).toBe(2);
