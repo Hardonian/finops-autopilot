@@ -1,5 +1,9 @@
 # finops-autopilot
 
+<!-- BEGIN: REPO HERO -->
+![finops-autopilot — hero generated locally on the GPU stack](assets/repo-hero.png)
+<!-- END: REPO HERO -->
+
 A runnerless FinOps autopilot that ingests billing event exports, reconciles expected vs observed revenue, detects anomalies, and outputs explainable churn risk signals.
 
 > **Boundary Statement**: This tool does not receive webhooks, run workers, or store secrets. It processes offline billing exports and outputs JobForge job requests for batch execution.
